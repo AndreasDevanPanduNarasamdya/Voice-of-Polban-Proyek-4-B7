@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 
-import '../controllers/article_controller.dart';
+import '../controllers/editor_controller.dart';
 import '../controllers/auth_controller.dart';
 import '../models/app_enums.dart';
 import '../models/article_model.dart';

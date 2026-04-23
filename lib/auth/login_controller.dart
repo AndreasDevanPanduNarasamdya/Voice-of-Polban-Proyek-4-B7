@@ -1,22 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
+import 'package:voice_of_polban/models/user_model.dart';
 import 'package:voice_of_polban/view/home_view.dart';
 
 class LoginController {
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  void submitData(BuildContext context) {
-    String username = usernameController.text;
-    String password = passwordController.text;
+  bool submitData(BuildContext context) {
+    String typedUsername = usernameController.text;
+    String typedPassword = passwordController.text;
 
-    if (username == "admin" && password == "1234") {
+    final box = Hive.box<UserModel>('users_box');
+
+    UserModel? loggedInUser;
+
+    try {
+      loggedInUser = box.values.firstWhere(
+        (user) => user.name == typedUsername && user.password == typedPassword,
+      );
+    } catch (e) {
+      loggedInUser = null;
+    }
+
+    if (loggedInUser != null) {
+      print("$typedUsername is right");
+      print("$typedPassword is right");
+      print("Logged in as: ${loggedInUser.role}");
+
       Navigator.pushReplacement(
         context,
+
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
-      print("${username} is right");
-      print("${password} is right");
+      return true;
     } else {
+      print("$typedUsername is wrong");
+      print("$typedPassword is wrong");
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Username atau Password salah!"),
@@ -24,8 +45,7 @@ class LoginController {
           behavior: SnackBarBehavior.floating,
         ),
       );
-      print("${username} is wrong");
-      print("${password} is wrong");
+      return false;
     }
   }
 

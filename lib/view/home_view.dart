@@ -2,10 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:voice_of_polban/view/article_view.dart';
 import 'package:voice_of_polban/controller/home_controller.dart';
+import 'package:voice_of_polban/models/article_model.dart'; // ← Change 1a: new import
 
 class HomePage extends StatefulWidget {
-  // final LocalData local;
-  const HomePage({super.key /*,required this.local*/});
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePage();
@@ -13,7 +13,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePage extends State<HomePage> {
   final HomeController _controller = HomeController();
-  late List<Map<String, String>> _feedData;
+  late List<ArticleModel> _feedData; // ← Change 1b: variable type
 
   @override
   void initState() {
@@ -56,7 +56,8 @@ class _HomePage extends State<HomePage> {
     );
   }
 
-  Widget _buildPlaceholderCard(BuildContext context, Map<String, String> data) {
+  Widget _buildPlaceholderCard(BuildContext context, ArticleModel article) {
+    // ← Change 2: parameter type
     return Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -65,7 +66,11 @@ class _HomePage extends State<HomePage> {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ArticlePage()),
+                MaterialPageRoute(
+                  builder: (context) => ArticlePage(
+                    articleId: article.id,
+                  ), // ← Change 3: dot notation
+                ),
               );
             },
             child: Column(
@@ -77,7 +82,7 @@ class _HomePage extends State<HomePage> {
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.black12),
                   ),
-                  child: Text(data["gambar"] ?? "GAMBAR"),
+                  child: Text("article.image"),
                 ),
                 Container(
                   height: 80,
@@ -86,7 +91,7 @@ class _HomePage extends State<HomePage> {
                     border: Border.all(color: Colors.black12),
                   ),
                   child: Text(
-                    data["judul"] ?? "JUDUL",
+                    article.title, // ← Change 4b
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -96,7 +101,7 @@ class _HomePage extends State<HomePage> {
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.black12),
                   ),
-                  child: Text(data["deskripsi"] ?? "DESKRIPSI"),
+                  child: Text(article.content), // ← Change 4c
                 ),
               ],
             ),

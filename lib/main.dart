@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-
+import 'auth/login_view.dart';
 import 'screens/debug_dashboard.dart';
 import 'models/hive_setup.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await setupHive();
+  await seedInitialUsers();
+  await seedInitialArticles();
   runApp(const VoiceOfPolbanApp());
 }
 
@@ -16,7 +18,7 @@ class VoiceOfPolbanApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: const DebugDashboard(),
+      home: const LoginView(),
     );
   }
 }

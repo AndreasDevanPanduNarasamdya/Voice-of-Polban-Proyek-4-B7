@@ -1,18 +1,40 @@
-class ArticleController {
-  // This is your unpacking/loading algorithm.
-  // Later, this will be an async function that grabs JSON from your backend.
-  Map<String, String> loadArticleData() {
-    print("Fetching article data...");
+import 'package:hive/hive.dart';
+import '../models/article_model.dart';
+import '../models/app_enums.dart';
 
-    // Placeholder data acting as your database response
-    return {
-      "judul": "Berita Utama MetroPolban",
-      "deskripsi":
-          "Liputan khusus mengenai perkembangan sistem baru di lingkungan kampus.",
-      "penulis": "Tim Jurnalis",
-      "gambar": "GAMBAR PLACEHOLDER",
-      "teks":
-          "Ini adalah teks isi artikel. Bayangkan ini berisi banyak paragraf penting. \n\nSemua data ini di-load langsung dari controller, bukan ditulis mati (hardcode) di dalam View!",
-    };
+class ArticleController {
+  ArticleModel? getArticle(String articleId) {
+    print("Fetching article $articleId from Hive...");
+    final box = Hive.box<ArticleModel>('articles_box');
+
+    return box.get(articleId);
+  }
+
+  Future<void> deleteArticle(String articleId) async {
+    final box = Hive.box<ArticleModel>('articles_box');
+
+    await box.delete(articleId);
+    print("Article $articleId permanently deleted from Hive.");
+  }
+
+  Future<void> archiveArticle(String articleId) async {
+    final box = Hive.box<ArticleModel>('articles_box');
+    final existingArticle = box.get(articleId);
+
+    if (existingArticle != null) {
+      final archivedArticle = ArticleModel(
+        id: existingArticle.id,
+        title: existingArticle.title,
+        content: existingArticle.content,
+        category: existingArticle.category,
+        authorId: existingArticle.authorId,
+        status: ArticleStatus.archived,
+        rejectionNote: existingArticle.rejectionNote,
+        createdAt: existingArticle.createdAt,
+      );
+
+      await box.put(articleId, archivedArticle);
+      print("Article $articleId status changed to Archived.");
+    }
   }
 }
