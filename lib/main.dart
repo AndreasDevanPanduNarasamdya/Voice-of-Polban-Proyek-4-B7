@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'screens/debug_dashboard.dart';
 import 'models/hive_setup.dart';
 
 Future<void> main() async {
@@ -15,12 +16,7 @@ class VoiceOfPolbanApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('VOP Prototype'),
-        ),
-        body: const Center(),
-      ),
+      home: const DebugDashboard(),
     );
   }
 }
