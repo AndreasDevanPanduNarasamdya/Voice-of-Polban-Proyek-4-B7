@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:voice_of_polban/view/article_view.dart';
+import 'package:voice_of_polban/controller/home_controller.dart';
 
 class HomePage extends StatefulWidget {
   // final LocalData local;
@@ -11,6 +12,15 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePage extends State<HomePage> {
+  final HomeController _controller = HomeController();
+  late List<Map<String, String>> _feedData;
+
+  @override
+  void initState() {
+    super.initState();
+    _feedData = _controller.loadFeedData();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -20,13 +30,17 @@ class _HomePage extends State<HomePage> {
         centerTitle: true,
         actions: const [Icon(Icons.account_circle), SizedBox(width: 16)],
       ),
-      body: ListView(
+      body: ListView.builder(
         padding: const EdgeInsets.all(16.0),
-        children: [
-          _buildPlaceholderCard(context),
-          const SizedBox(height: 16),
-          _buildPlaceholderCard(context),
-        ],
+        itemCount: _feedData.length,
+        itemBuilder: (context, index) {
+          final articleData = _feedData[index];
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: _buildPlaceholderCard(context, articleData),
+          );
+        },
       ),
       bottomNavigationBar: BottomAppBar(
         child: Row(
@@ -42,7 +56,7 @@ class _HomePage extends State<HomePage> {
     );
   }
 
-  Widget _buildPlaceholderCard(BuildContext context) {
+  Widget _buildPlaceholderCard(BuildContext context, Map<String, String> data) {
     return Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -63,7 +77,7 @@ class _HomePage extends State<HomePage> {
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.black12),
                   ),
-                  child: const Text("GAMBAR"),
+                  child: Text(data["gambar"] ?? "GAMBAR"),
                 ),
                 Container(
                   height: 80,
@@ -71,7 +85,10 @@ class _HomePage extends State<HomePage> {
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.black12),
                   ),
-                  child: const Text("JUDUL"),
+                  child: Text(
+                    data["judul"] ?? "JUDUL",
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -79,7 +96,7 @@ class _HomePage extends State<HomePage> {
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.black12),
                   ),
-                  child: const Text("DESKRIPSI"),
+                  child: Text(data["deskripsi"] ?? "DESKRIPSI"),
                 ),
               ],
             ),

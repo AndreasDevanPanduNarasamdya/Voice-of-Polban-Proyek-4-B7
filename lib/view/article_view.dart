@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../controller/article_controller.dart';
 
 class ArticlePage extends StatefulWidget {
   // final LocalData local;
@@ -10,6 +11,15 @@ class ArticlePage extends StatefulWidget {
 }
 
 class _ArticlePage extends State<ArticlePage> {
+  final ArticleController _controller = ArticleController();
+  late Map<String, String> _articleData;
+
+  @override
+  void initState() {
+    super.initState();
+    _articleData = _controller.loadArticleData();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -26,21 +36,24 @@ class _ArticlePage extends State<ArticlePage> {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          const Text(
-            "Judul Artikel",
+          Text(
+            _articleData["judul"] ?? "Judul Tidak Tersedia",
             textAlign: TextAlign.left,
             style: TextStyle(fontSize: 24),
           ),
           const SizedBox(height: 8),
 
-          const Text(
-            "Deskripsi Artikel",
+          Text(
+            _articleData["deskripsi"] ?? "Deskripsi Tidak Tersedia",
             textAlign: TextAlign.left,
             style: TextStyle(fontSize: 19),
           ),
           const SizedBox(height: 16),
 
-          const Text("Nama Penulis Artikel", textAlign: TextAlign.left),
+          Text(
+            _articleData["penulis"] ?? "Penulis Tidak Diketahui",
+            textAlign: TextAlign.left,
+          ),
           const SizedBox(height: 24),
 
           Container(
@@ -49,12 +62,15 @@ class _ArticlePage extends State<ArticlePage> {
             decoration: BoxDecoration(
               border: Border.all(color: Colors.black12),
             ),
-            child: const Text("GAMBAR", style: TextStyle(fontSize: 24)),
+            child: Text(
+              _articleData["gambar"] ?? "GAMBAR",
+              style: TextStyle(fontSize: 24),
+            ),
           ),
           const SizedBox(height: 24),
 
-          const Text(
-            "Teks Isi Artikel",
+          Text(
+            _articleData["teks"] ?? "Isi teks tidak tersedia.",
             textAlign: TextAlign.left,
             style: TextStyle(fontSize: 14),
           ),

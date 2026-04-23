@@ -8,14 +8,14 @@ class LoginController {
   void submitData(BuildContext context) {
     String username = usernameController.text;
     String password = passwordController.text;
-    
+
     if (username == "admin" && password == "1234") {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
-    print("${username} is right");
-    print("${password} is right");
+      print("${username} is right");
+      print("${password} is right");
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -24,8 +24,8 @@ class LoginController {
           behavior: SnackBarBehavior.floating,
         ),
       );
-    print("${username} is wrong");
-    print("${password} is wrong");
+      print("${username} is wrong");
+      print("${password} is wrong");
     }
   }
 
