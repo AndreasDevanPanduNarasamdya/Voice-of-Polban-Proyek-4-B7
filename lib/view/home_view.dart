@@ -32,10 +32,10 @@ class _HomePage extends State<HomePage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: const [
-            Icon(Icons.circle, size: 40),
-            Icon(Icons.circle, size: 40),
-            Icon(Icons.circle, size: 40),
-            Icon(Icons.circle, size: 40),
+            Icon(Icons.language, size: 40), //Kategori Umum
+            Icon(Icons.emoji_events_sharp, size: 40), // Kategori Lomba
+            Icon(Icons.event, size: 40), //Kategori Event
+            Icon(Icons.group, size: 40), //Kategori Ormawa
           ],
         ),
       ),
