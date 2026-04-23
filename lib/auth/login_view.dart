@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:voice_of_polban/auth/login_controller.dart';
 import 'package:voice_of_polban/view/home_view.dart';
 
 class LoginView extends StatefulWidget {
-  // final UserModel LoggedInUser;
   const LoginView({super.key /*,required this.LoggedInUser*/});
 
   @override
@@ -10,11 +10,18 @@ class LoginView extends StatefulWidget {
 }
 
 class _LoginState extends State<LoginView> {
+  final LoginController _controller = LoginController();
+
   @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   Widget build(BuildContext context) {
     return (Scaffold(
       body: Padding(
-        padding: EdgeInsetsGeometry.all(30),
+        padding: EdgeInsets.all(30),
         child: Column(
           children: [
             Text(
@@ -23,24 +30,19 @@ class _LoginState extends State<LoginView> {
               textAlign: TextAlign.center,
             ),
             TextField(
-              /*controller: ,*/ decoration: InputDecoration(
+              controller: _controller.usernameController, decoration: InputDecoration(
                 labelText: "Username",
               ),
             ),
             TextField(
-              /*controller: ,*/ decoration: InputDecoration(
+              controller: _controller.passwordController, decoration: InputDecoration(
                 labelText: "Password",
               ),
             ),
             Padding(
               padding: EdgeInsetsGeometry.all(30),
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const HomePage()),
-                  );
-                },
+                onPressed: () {_controller.submitData(context);},
                 child: Text("Log In"),
               ),
             ),
