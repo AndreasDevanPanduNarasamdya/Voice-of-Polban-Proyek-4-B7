@@ -1,40 +1,76 @@
 import 'package:hive/hive.dart';
-import '../models/article_model.dart';
+import 'package:uuid/uuid.dart';
 import '../models/app_enums.dart';
+import '../models/article_model.dart';
 
 class ArticleController {
+  static const int _latestArticlesLimit = 5;
+  final Uuid _uuid = const Uuid();
+
+  Box<ArticleModel> get _articlesBox => Hive.box<ArticleModel>('articles_box');
+
+  // ← single getter, used by ArticlePage
   ArticleModel? getArticle(String articleId) {
-    print("Fetching article $articleId from Hive...");
-    final box = Hive.box<ArticleModel>('articles_box');
-
-    return box.get(articleId);
+    return _articlesBox.get(articleId);
   }
 
-  Future<void> deleteArticle(String articleId) async {
-    final box = Hive.box<ArticleModel>('articles_box');
-
-    await box.delete(articleId);
-    print("Article $articleId permanently deleted from Hive.");
+  // ← used by HomePage
+  List<ArticleModel> getLatestArticles() {
+    return _articlesBox.values
+        .where((article) => article.status == ArticleStatus.published)
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
-  Future<void> archiveArticle(String articleId) async {
-    final box = Hive.box<ArticleModel>('articles_box');
-    final existingArticle = box.get(articleId);
-
-    if (existingArticle != null) {
-      final archivedArticle = ArticleModel(
-        id: existingArticle.id,
-        title: existingArticle.title,
-        content: existingArticle.content,
-        category: existingArticle.category,
-        authorId: existingArticle.authorId,
-        status: ArticleStatus.archived,
-        rejectionNote: existingArticle.rejectionNote,
-        createdAt: existingArticle.createdAt,
-      );
-
-      await box.put(articleId, archivedArticle);
-      print("Article $articleId status changed to Archived.");
-    }
+  List<ArticleModel> getLatestArticlesByCategory(ArticleCategory category) {
+    return _articlesBox.values
+        .where((article) =>
+            article.status == ArticleStatus.published &&
+            article.category == category)
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt))
+        ..take(_latestArticlesLimit).toList();
   }
+
+  void saveDraft(String title, String content, ArticleCategory category, String authorId) {
+    final String articleId = _uuid.v4();
+    _articlesBox.put(
+      articleId,
+      ArticleModel(
+        id: articleId,
+        title: title,
+        content: content,
+        category: category,
+        authorId: authorId,
+        status: ArticleStatus.draft,
+        createdAt: DateTime.now(),
+      ),
+    );
+  }
+
+  void _updateStatus(String articleId, ArticleStatus status, {String? rejectionNote}) {
+    final ArticleModel? article = _articlesBox.get(articleId);
+    if (article == null) return;
+
+    _articlesBox.put(
+      articleId,
+      ArticleModel(
+        id: article.id,
+        title: article.title,
+        content: article.content,
+        category: article.category,
+        authorId: article.authorId,
+        status: status,
+        rejectionNote: rejectionNote ?? article.rejectionNote,
+        createdAt: article.createdAt,
+      ),
+    );
+  }
+
+  void submitDraft(String articleId) => _updateStatus(articleId, ArticleStatus.pending);
+  void approveArticle(String articleId) => _updateStatus(articleId, ArticleStatus.approved);
+  void publishArticle(String articleId) => _updateStatus(articleId, ArticleStatus.published);
+  void archiveArticle(String articleId) => _updateStatus(articleId, ArticleStatus.archived);
+  void rejectArticle(String articleId, String note) => _updateStatus(articleId, ArticleStatus.rejected, rejectionNote: note);
+  void deleteArticle(String articleId) => _articlesBox.delete(articleId);
 }

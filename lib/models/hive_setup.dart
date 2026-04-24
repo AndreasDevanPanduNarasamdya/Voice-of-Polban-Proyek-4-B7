@@ -7,11 +7,9 @@ import 'user_model.dart';
 Future<void> setupHive() async {
   await Hive.initFlutter();
 
-  // THE NUKE (Remember to remove these after your first successful run!)
   await Hive.deleteBoxFromDisk('users_box');
   await Hive.deleteBoxFromDisk('articles_box');
 
-  // 1. REGISTER ADAPTERS FIRST
   if (!Hive.isAdapterRegistered(1)) {
     Hive.registerAdapter(UserRoleAdapter());
   }
@@ -28,11 +26,49 @@ Future<void> setupHive() async {
     Hive.registerAdapter(ArticleModelAdapter());
   }
 
-  // 2. THEN OPEN THE BOXES
   await Hive.openBox<UserModel>('users_box');
   await Hive.openBox<ArticleModel>('articles_box');
 
-  // 3. SEED USERS
+  final box = Hive.box<UserModel>('users_box');
+
+  if (box.isEmpty) {
+    print("Users box is empty. Seeding generic accounts...");
+
+    final editor = UserModel(
+      id: 'usr_editor',
+      name: 'Chief Editor',
+      email: 'editor',
+      password: 'password123',
+      role: UserRole.editor,
+    );
+
+    final writer = UserModel(
+      id: 'usr_writer',
+      name: 'Staff Writer',
+      email: 'writer',
+      password: 'password123',
+      role: UserRole.writer,
+    );
+
+    final reader = UserModel(
+      id: 'usr_reader',
+      name: 'Student Reader',
+      email: 'reader',
+      password: 'password123',
+      role: UserRole.reader,
+    );
+
+    await box.put(editor.id, editor);
+    await box.put(writer.id, writer);
+    await box.put(reader.id, reader);
+
+    print("Generic users injected successfully!");
+  } else {
+    print("Users already exist. Skipping seed.");
+  }
+}
+
+Future<void> seedInitialUsers() async {
   final box = Hive.box<UserModel>('users_box');
 
   if (box.isEmpty) {

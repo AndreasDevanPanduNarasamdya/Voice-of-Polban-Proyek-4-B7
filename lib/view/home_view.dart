@@ -1,24 +1,23 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:voice_of_polban/view/article_view.dart';
-import 'package:voice_of_polban/controller/home_controller.dart';
-import 'package:voice_of_polban/models/article_model.dart'; // ← Change 1a: new import
+import '../models/article_model.dart';
+import '../controller/article_controller.dart';
+import 'article_view.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePage();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePage extends State<HomePage> {
-  final HomeController _controller = HomeController();
-  late List<ArticleModel> _feedData; // ← Change 1b: variable type
+class _HomePageState extends State<HomePage> {
+  final ArticleController _controller = ArticleController();
+  late List<ArticleModel> _feedData;
 
   @override
   void initState() {
     super.initState();
-    _feedData = _controller.loadFeedData();
+    _feedData = _controller.getLatestArticles();
   }
 
   @override
@@ -30,18 +29,18 @@ class _HomePage extends State<HomePage> {
         centerTitle: true,
         actions: const [Icon(Icons.account_circle), SizedBox(width: 16)],
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16.0),
-        itemCount: _feedData.length,
-        itemBuilder: (context, index) {
-          final articleData = _feedData[index];
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16.0),
-            child: _buildPlaceholderCard(context, articleData),
-          );
-        },
-      ),
+      body: _feedData.isEmpty
+          ? const Center(child: Text("Belum ada artikel yang dipublikasikan."))
+          : ListView.builder(
+              padding: const EdgeInsets.all(16.0),
+              itemCount: _feedData.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: _buildArticleCard(context, _feedData[index]),
+                );
+              },
+            ),
       bottomNavigationBar: BottomAppBar(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -56,8 +55,7 @@ class _HomePage extends State<HomePage> {
     );
   }
 
-  Widget _buildPlaceholderCard(BuildContext context, ArticleModel article) {
-    // ← Change 2: parameter type
+  Widget _buildArticleCard(BuildContext context, ArticleModel article) {
     return Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -67,9 +65,7 @@ class _HomePage extends State<HomePage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ArticlePage(
-                    articleId: article.id,
-                  ), // ← Change 3: dot notation
+                  builder: (context) => ArticlePage(articleId: article.id),
                 ),
               );
             },
@@ -79,43 +75,30 @@ class _HomePage extends State<HomePage> {
                 Container(
                   height: 150,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.black12),
-                  ),
-                  child: Text("article.image"),
+                  decoration: BoxDecoration(border: Border.all(color: Colors.black12)),
+                  child: const Text("GAMBAR"),
                 ),
                 Container(
                   height: 80,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.black12),
-                  ),
-                  child: Text(
-                    article.title, // ← Change 4b
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  decoration: BoxDecoration(border: Border.all(color: Colors.black12)),
+                  child: Text(article.title, style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.black12),
-                  ),
-                  child: Text(article.content), // ← Change 4c
+                  decoration: BoxDecoration(border: Border.all(color: Colors.black12)),
+                  child: Text(article.content),
                 ),
               ],
             ),
           ),
-
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.bookmark_border),
-                  onPressed: () {},
-                ),
+                IconButton(icon: const Icon(Icons.bookmark_border), onPressed: () {}),
                 IconButton(icon: const Icon(Icons.share), onPressed: () {}),
               ],
             ),
