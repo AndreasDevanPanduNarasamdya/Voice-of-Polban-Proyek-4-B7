@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:voice_of_polban/view/home_view.dart';
 import 'package:voice_of_polban/view/article_view.dart';
 import 'package:voice_of_polban/view/writer_view.dart';
+import 'package:voice_of_polban/view/sidebar.dart';
 import 'auth/login_view.dart';
 
 void main() {
@@ -14,7 +15,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Demo',
-      theme: ThemeData(colorScheme: .fromSeed(seedColor: Colors.deepPurple)),
+      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple)),
       home: const LoginView(),
     );
   }
