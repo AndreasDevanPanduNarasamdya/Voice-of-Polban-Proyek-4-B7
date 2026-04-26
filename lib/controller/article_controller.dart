@@ -4,116 +4,96 @@ import '../models/app_enums.dart';
 import '../models/article_model.dart';
 
 class ArticleController {
-  static const int _latestArticlesLimit = 5;
   final Uuid _uuid = const Uuid();
 
-  // Getter untuk mengakses box Hive yang telah diinisialisasi di hive_setup
+  // Box references berdasarkan ERD baru
   Box<ArticleModel> get _articlesBox => Hive.box<ArticleModel>('articles_box');
+  
+  // Asumsi Anda akan membuat Box tambahan untuk Section dan Draft Lokal
+  Box get _sectionBox => Hive.box('sections_box');
 
   // --- READ ENDPOINTS ---
 
-  /// Mengambil data artikel spesifik berdasarkan ID
   ArticleModel? getArticle(String articleId) => _articlesBox.get(articleId);
 
-  /// Menampilkan daftar berita yang sudah Published untuk user (Tahap 4)
-  List<ArticleModel> getPublishedArticles() {
+  /// Mengambil artikel berdasarkan Section (Kategori baru di ERD)
+  List<ArticleModel> getArticlesBySection(String sectionId) {
     return _articlesBox.values
-        .where((article) => article.status == ArticleStatus.published)
-        .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-  }
-
-  /// Dashboard untuk Editor: Mengambil artikel dengan status Pending
-  List<ArticleModel> getPendingArticles() {
-    return _articlesBox.values
-        .where((article) => article.status == ArticleStatus.pending)
+        .where((article) => article.sectionId == sectionId && article.status == ArticleStatus.published)
         .toList();
   }
 
-  // Digunakan oleh HomePage untuk mengambil berita terbaru yang sudah terbit
   List<ArticleModel> getLatestArticles() {
     return _articlesBox.values
-        // 1. Filter: Hanya ambil yang statusnya sudah 'published'
         .where((article) => article.status == ArticleStatus.published)
         .toList()
-      // 2. Sort: Urutkan berdasarkan tanggal (Terbaru di atas)
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
-  // --- WRITE & WORKFLOW ENDPOINTS ---
+  // --- WORKFLOW: WRITER (LOCAL_DRAFT) ---
 
-  /// Tahap 1: Penulisan Draf (Hybrid/Offline)
-  /// Menyimpan draf ke database lokal Hive dengan status awal Draft.
-  void saveDraft({
+  /// Tahap 1: Simpan ke LOCAL_DRAFT
+  /// Sesuai ERD, LOCAL_DRAFT menyimpan draf sebelum sinkronisasi ke tabel ARTICLE utama.
+  void saveLocalDraft({
     required String title,
     required String content,
-    required ArticleCategory category,
-    required String authorId,
+    required String sectionId,
+    required String userId,
   }) {
     final String articleId = _uuid.v4();
+    
     final newArticle = ArticleModel(
       id: articleId,
       title: title,
       content: content,
-      category: category,
-      authorId: authorId,
+      sectionId: sectionId, // Menggunakan section_id dari tabel SECTION
+      authorId: userId,
       status: ArticleStatus.draft,
       createdAt: DateTime.now(),
     );
+    
     _articlesBox.put(articleId, newArticle);
+    // Logika tambahan: Di sini Anda bisa memasukkan payload ke SYNC_QUEUE 
+    // untuk sinkronisasi ke Cloud nantinya.
   }
 
-  /// Tahap 2: Review Editor (Submit)
-  /// Mengubah status draf menjadi Pending agar muncul di dashboard Editor.
-  void submitForReview(String articleId) {
-    _updateStatus(articleId, ArticleStatus.pending);
-  }
+  // --- WORKFLOW: EDITOR (REVISION & REVIEW) ---
 
-  /// Tahap 3: Keputusan Editor - Reject
-  /// Mengembalikan berita ke Writer dengan catatan revisi (rejectionNote).
-  void rejectArticle(String articleId, String reason) {
-    _updateStatus(
-      articleId,
-      ArticleStatus.rejected,
-      note: reason,
-    );
-  }
-
-  void updateArticle({
-  required String articleId,
-  required String title,
-  required String content,
-  required ArticleCategory category,
+  /// Tahap 2 & 3: Keputusan Editor & Histori Revisi
+  /// Sesuai tabel REVISION_HISTORY, setiap tindakan editor harus dicatat.
+  void reviewArticle({
+    required String articleId,
+    required String editorId,
+    required bool approved,
+    String? note,
   }) {
     final article = getArticle(articleId);
     if (article == null) return;
 
+    final newStatus = approved ? ArticleStatus.approved : ArticleStatus.rejected;
+
+    // 1. Update status artikel utama
     _articlesBox.put(
       articleId,
-      ArticleModel(
-        id: article.id,
-        title: title,
-        content: content,
-        category: category,
-        authorId: article.authorId,
-        status: ArticleStatus.draft, // Kembali ke draf saat diedit
-        createdAt: article.createdAt,
-        rejectionNote: null, // Hapus catatan lama karena sudah direvisi
+      article.copyWith(
+        status: newStatus,
+        editorId: editorId, // Mencatat siapa editor yang menangani
+        rejectionNote: note,
       ),
+    );
+
+    // 2. Simulasi pencatatan ke REVISION_HISTORY (Sesuai ERD)
+    _addToRevisionHistory(
+      articleId: articleId,
+      editorId: editorId,
+      action: approved ? 'APPROVE' : 'REJECT',
+      note: note ?? '',
     );
   }
 
-  /// Tahap 3: Keputusan Editor - Approve
-  /// Menyetujui artikel sehingga siap untuk dipublikasikan.
-  void approveArticle(String articleId) {
-    _updateStatus(articleId, ArticleStatus.approved);
-  }
-
-  /// Tahap 4: Publikasi & Distribusi
-  /// Mengubah status menjadi Published untuk didistribusikan ke pembaca.
+  /// Tahap 4: Publikasi
   void publishArticle(String articleId) {
     final article = getArticle(articleId);
-    // Validasi: Hanya artikel yang sudah Approved yang bisa dipublikasikan
     if (article != null && article.status == ArticleStatus.approved) {
       _updateStatus(articleId, ArticleStatus.published);
     }
@@ -121,26 +101,41 @@ class ArticleController {
 
   // --- INTERNAL UTILS ---
 
-  /// Fungsi internal untuk update status dan mempertahankan data lainnya
-  void _updateStatus(String articleId, ArticleStatus status, {String? note}) {
+  void _updateStatus(String articleId, ArticleStatus status) {
     final article = _articlesBox.get(articleId);
     if (article == null) return;
-
-    _articlesBox.put(
-      articleId,
-      ArticleModel(
-        id: article.id,
-        title: article.title,
-        content: article.content,
-        category: article.category,
-        authorId: article.authorId,
-        status: status,
-        rejectionNote: note ?? article.rejectionNote,
-        createdAt: article.createdAt,
-      ),
-    );
+    _articlesBox.put(articleId, article.copyWith(status: status));
   }
 
-  /// Menghapus data artikel dari Hive
-  void deleteArticle(String articleId) => _articlesBox.delete(articleId);
+  /// Helper untuk mencatat histori revisi sesuai ERD
+  void _addToRevisionHistory({
+    required String articleId,
+    required String editorId,
+    required String action,
+    required String note,
+  }) {
+    // Di sini Anda akan menyimpan ke Box 'revision_history_box'
+    print("Log: Revision saved for $articleId by $editorId: $action - $note");
+  }
+}
+
+// Helper Extension agar update status lebih bersih
+extension on ArticleModel {
+  ArticleModel copyWith({
+    ArticleStatus? status,
+    String? editorId,
+    String? rejectionNote,
+  }) {
+    return ArticleModel(
+      id: id,
+      title: title,
+      content: content,
+      sectionId: sectionId,
+      authorId: authorId,
+      editorId: editorId ?? this.editorId,
+      status: status ?? this.status,
+      rejectionNote: rejectionNote ?? this.rejectionNote,
+      createdAt: createdAt,
+    );
+  }
 }
