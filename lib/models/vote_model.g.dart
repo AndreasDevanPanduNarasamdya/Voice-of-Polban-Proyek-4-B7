@@ -1,50 +1,44 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'user_model.dart';
+part of 'vote_model.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class UserModelAdapter extends TypeAdapter<UserModel> {
+class VoteModelAdapter extends TypeAdapter<VoteModel> {
   @override
-  final int typeId = 2;
+  final int typeId = 8;
 
   @override
-  UserModel read(BinaryReader reader) {
+  VoteModel read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return UserModel(
-      userId: fields[0] as String,
-      name: fields[1] as String,
-      email: fields[2] as String,
-      passwordHash: fields[3] as String,
-      role: fields[4] as String,
-      createdAt: fields[5] as DateTime,
-      updatedAt: fields[6] as DateTime,
+    return VoteModel(
+      voteId: fields[0] as String,
+      upvoteStatus: fields[1] as bool,
+      articleId: fields[2] as String,
+      userId: fields[3] as String,
+      isSynced: fields[4] as bool,
     );
   }
 
   @override
-  void write(BinaryWriter writer, UserModel obj) {
+  void write(BinaryWriter writer, VoteModel obj) {
     writer
-      ..writeByte(7)
-      ..writeByte(0)
-      ..write(obj.userId)
-      ..writeByte(1)
-      ..write(obj.name)
-      ..writeByte(2)
-      ..write(obj.email)
-      ..writeByte(3)
-      ..write(obj.passwordHash)
-      ..writeByte(4)
-      ..write(obj.role)
       ..writeByte(5)
-      ..write(obj.createdAt)
-      ..writeByte(6)
-      ..write(obj.updatedAt);
+      ..writeByte(0)
+      ..write(obj.voteId)
+      ..writeByte(1)
+      ..write(obj.upvoteStatus)
+      ..writeByte(2)
+      ..write(obj.articleId)
+      ..writeByte(3)
+      ..write(obj.userId)
+      ..writeByte(4)
+      ..write(obj.isSynced);
   }
 
   @override
@@ -53,7 +47,7 @@ class UserModelAdapter extends TypeAdapter<UserModel> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is UserModelAdapter &&
+      other is VoteModelAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

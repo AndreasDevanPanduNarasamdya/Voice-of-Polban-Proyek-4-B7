@@ -1,50 +1,47 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'user_model.dart';
+part of 'local_draft_model.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class UserModelAdapter extends TypeAdapter<UserModel> {
+class LocalDraftModelAdapter extends TypeAdapter<LocalDraftModel> {
   @override
-  final int typeId = 2;
+  final int typeId = 11;
 
   @override
-  UserModel read(BinaryReader reader) {
+  LocalDraftModel read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return UserModel(
-      userId: fields[0] as String,
-      name: fields[1] as String,
-      email: fields[2] as String,
-      passwordHash: fields[3] as String,
-      role: fields[4] as String,
-      createdAt: fields[5] as DateTime,
-      updatedAt: fields[6] as DateTime,
+    return LocalDraftModel(
+      localId: fields[0] as String,
+      articleId: fields[1] as String,
+      userId: fields[2] as String,
+      title: fields[3] as String,
+      content: fields[4] as String,
+      status: fields[5] as String,
     );
   }
 
   @override
-  void write(BinaryWriter writer, UserModel obj) {
+  void write(BinaryWriter writer, LocalDraftModel obj) {
     writer
-      ..writeByte(7)
-      ..writeByte(0)
-      ..write(obj.userId)
-      ..writeByte(1)
-      ..write(obj.name)
-      ..writeByte(2)
-      ..write(obj.email)
-      ..writeByte(3)
-      ..write(obj.passwordHash)
-      ..writeByte(4)
-      ..write(obj.role)
-      ..writeByte(5)
-      ..write(obj.createdAt)
       ..writeByte(6)
-      ..write(obj.updatedAt);
+      ..writeByte(0)
+      ..write(obj.localId)
+      ..writeByte(1)
+      ..write(obj.articleId)
+      ..writeByte(2)
+      ..write(obj.userId)
+      ..writeByte(3)
+      ..write(obj.title)
+      ..writeByte(4)
+      ..write(obj.content)
+      ..writeByte(5)
+      ..write(obj.status);
   }
 
   @override
@@ -53,7 +50,7 @@ class UserModelAdapter extends TypeAdapter<UserModel> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is UserModelAdapter &&
+      other is LocalDraftModelAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

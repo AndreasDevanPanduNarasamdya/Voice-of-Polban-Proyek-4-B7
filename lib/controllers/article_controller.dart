@@ -1,30 +1,43 @@
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 
-import '../models/app_enums.dart';
 import '../models/article_model.dart';
+import '../models/section_model.dart';
 
 class ArticleController {
   static const int _latestArticlesLimit = 5;
 
   final Uuid _uuid = const Uuid();
 
-  Box<ArticleModel> get _articlesBox => Hive.box<ArticleModel>('articles_box');
+  Box<ArticleModel> get _articlesBox => Hive.box<ArticleModel>('article_box');
 
-  void saveDraft(
-    String title,
-    String content,
-    ArticleCategory category,
-    String authorId,
-  ) {
+  Box<SectionModel> get _sectionBox => Hive.box<SectionModel>('section_box');
+
+  Future<void> seedDummySection() async {
+    if (_sectionBox.isNotEmpty) {
+      return;
+    }
+
+    await _sectionBox.put(
+      'sec-1',
+      SectionModel(
+        sectionId: 'sec-1',
+        name: 'Akademik',
+        createdAt: DateTime.now(),
+      ),
+    );
+  }
+
+  void saveDraft(String title, String content, String authorId) {
     final String articleId = _uuid.v4();
     final ArticleModel draftArticle = ArticleModel(
-      id: articleId,
+      articleId: articleId,
       title: title,
       content: content,
-      category: category,
+      sectionId: 'sec-1',
       authorId: authorId,
-      status: ArticleStatus.draft,
+      editorId: '',
+      status: 'draft',
       createdAt: DateTime.now(),
     );
 
@@ -40,12 +53,13 @@ class ArticleController {
     _articlesBox.put(
       articleId,
       ArticleModel(
-        id: article.id,
+        articleId: article.articleId,
         title: article.title,
         content: article.content,
-        category: article.category,
+        sectionId: article.sectionId,
         authorId: article.authorId,
-        status: ArticleStatus.pending,
+        editorId: article.editorId,
+        status: 'pending',
         rejectionNote: article.rejectionNote,
         createdAt: article.createdAt,
       ),
@@ -61,12 +75,13 @@ class ArticleController {
     _articlesBox.put(
       articleId,
       ArticleModel(
-        id: article.id,
+        articleId: article.articleId,
         title: article.title,
         content: article.content,
-        category: article.category,
+        sectionId: article.sectionId,
         authorId: article.authorId,
-        status: ArticleStatus.approved,
+        editorId: article.editorId,
+        status: 'approved',
         rejectionNote: article.rejectionNote,
         createdAt: article.createdAt,
       ),
@@ -82,12 +97,13 @@ class ArticleController {
     _articlesBox.put(
       articleId,
       ArticleModel(
-        id: article.id,
+        articleId: article.articleId,
         title: article.title,
         content: article.content,
-        category: article.category,
+        sectionId: article.sectionId,
         authorId: article.authorId,
-        status: ArticleStatus.rejected,
+        editorId: article.editorId,
+        status: 'rejected',
         rejectionNote: note,
         createdAt: article.createdAt,
       ),
@@ -107,12 +123,13 @@ class ArticleController {
     _articlesBox.put(
       articleId,
       ArticleModel(
-        id: article.id,
+        articleId: article.articleId,
         title: article.title,
         content: article.content,
-        category: article.category,
+        sectionId: article.sectionId,
         authorId: article.authorId,
-        status: ArticleStatus.published,
+        editorId: article.editorId,
+        status: 'published',
         rejectionNote: article.rejectionNote,
         createdAt: article.createdAt,
       ),
@@ -128,25 +145,26 @@ class ArticleController {
     _articlesBox.put(
       articleId,
       ArticleModel(
-        id: article.id,
+        articleId: article.articleId,
         title: article.title,
         content: article.content,
-        category: article.category,
+        sectionId: article.sectionId,
         authorId: article.authorId,
-        status: ArticleStatus.archived,
+        editorId: article.editorId,
+        status: 'archived',
         rejectionNote: article.rejectionNote,
         createdAt: article.createdAt,
       ),
     );
   }
 
-  List<ArticleModel> getLatestArticlesByCategory(ArticleCategory category) {
+  List<ArticleModel> getLatestArticlesByCategory(String sectionId) {
     final List<ArticleModel> filteredArticles =
         _articlesBox.values
             .where(
               (ArticleModel article) =>
-                  article.status == ArticleStatus.published &&
-                  article.category == category,
+                  article.status == 'published' &&
+                  article.sectionId == sectionId,
             )
             .toList()
           ..sort((ArticleModel left, ArticleModel right) {

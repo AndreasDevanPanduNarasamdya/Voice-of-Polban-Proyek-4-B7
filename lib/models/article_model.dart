@@ -1,24 +1,23 @@
 import 'package:hive/hive.dart';
 
-import 'app_enums.dart';
-
 part 'article_model.g.dart';
 
-@HiveType(typeId: 5)
+@HiveType(typeId: 3)
 class ArticleModel {
   const ArticleModel({
-    required this.id,
+    required this.articleId,
     required this.title,
     required this.content,
-    required this.category,
+    required this.sectionId,
     required this.authorId,
+    required this.editorId,
     required this.status,
     this.rejectionNote,
     required this.createdAt,
   });
 
   @HiveField(0)
-  final String id;
+  final String articleId;
 
   @HiveField(1)
   final String title;
@@ -27,17 +26,20 @@ class ArticleModel {
   final String content;
 
   @HiveField(3)
-  final ArticleCategory category;
+  final String sectionId;
 
   @HiveField(4)
   final String authorId;
 
   @HiveField(5)
-  final ArticleStatus status;
+  final String editorId;
 
   @HiveField(6)
-  final String? rejectionNote;
+  final String status;
 
   @HiveField(7)
+  final String? rejectionNote;
+
+  @HiveField(8)
   final DateTime createdAt;
 }

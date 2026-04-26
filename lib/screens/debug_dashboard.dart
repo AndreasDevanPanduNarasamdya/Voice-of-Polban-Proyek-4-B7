@@ -3,7 +3,6 @@ import 'package:hive/hive.dart';
 
 import '../controllers/article_controller.dart';
 import '../controllers/auth_controller.dart';
-import '../models/app_enums.dart';
 import '../models/article_model.dart';
 
 class DebugDashboard extends StatefulWidget {
@@ -25,6 +24,7 @@ class _DebugDashboardState extends State<DebugDashboard> {
 
   Future<void> _seedUsers() async {
     await authController.seedDummyUsers();
+    await articleController.seedDummySection();
     if (mounted) {
       setState(() {});
     }
@@ -55,17 +55,14 @@ class _DebugDashboardState extends State<DebugDashboard> {
     articleController.saveDraft(
       'Demo Draft Title',
       'This is a dummy draft created from the debug dashboard.',
-      ArticleCategory.akademik,
-      currentUser.id,
+      currentUser.userId,
     );
 
     _showMessage('Draft saved for ${currentUser.name}.');
   }
 
   void _getOfflineArticles() {
-    final articles = articleController.getLatestArticlesByCategory(
-      ArticleCategory.akademik,
-    );
+    final articles = articleController.getLatestArticlesByCategory('sec-1');
     final titles = articles.map((article) => article.title).toList();
 
     // ignore: avoid_print
@@ -77,7 +74,7 @@ class _DebugDashboardState extends State<DebugDashboard> {
   }
 
   ArticleModel? _getFirstArticle() {
-    final box = Hive.box<ArticleModel>('articles_box');
+    final box = Hive.box<ArticleModel>('article_box');
     if (box.isEmpty) {
       return null;
     }
@@ -92,7 +89,8 @@ class _DebugDashboardState extends State<DebugDashboard> {
       return;
     }
 
-    articleController.submitDraft(article.id);
+    articleController.submitDraft(article.articleId);
+    setState(() {});
     _showMessage('Submitted article: ${article.title}');
   }
 
@@ -103,7 +101,8 @@ class _DebugDashboardState extends State<DebugDashboard> {
       return;
     }
 
-    articleController.approveArticle(article.id);
+    articleController.approveArticle(article.articleId);
+    setState(() {});
     _showMessage('Approved article: ${article.title}');
   }
 
@@ -114,7 +113,8 @@ class _DebugDashboardState extends State<DebugDashboard> {
       return;
     }
 
-    articleController.publishArticle(article.id);
+    articleController.publishArticle(article.articleId);
+    setState(() {});
     _showMessage('Published article: ${article.title}');
   }
 
@@ -125,7 +125,8 @@ class _DebugDashboardState extends State<DebugDashboard> {
       return;
     }
 
-    articleController.archiveArticle(article.id);
+    articleController.archiveArticle(article.articleId);
+    setState(() {});
     _showMessage('Archived article: ${article.title}');
   }
 
@@ -147,7 +148,7 @@ class _DebugDashboardState extends State<DebugDashboard> {
       return 'Current user: None';
     }
 
-    return 'Current user: ${currentUser.name} (${currentUser.role.name})';
+    return 'Current user: ${currentUser.name} (${currentUser.role})';
   }
 
   @override
