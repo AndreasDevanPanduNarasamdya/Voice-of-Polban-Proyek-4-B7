@@ -1,141 +1,205 @@
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
+import 'package:voice_of_polban/auth/auth_service.dart';
 import '../models/app_enums.dart';
 import '../models/article_model.dart';
+import '../models/user_model.dart';
+import '../models/revision_history_model.dart';
 
 class ArticleController {
+  static const int _latestArticlesLimit = 5;
   final Uuid _uuid = const Uuid();
 
-  // Box references berdasarkan ERD baru
-  Box<ArticleModel> get _articlesBox => Hive.box<ArticleModel>('articles_box');
-  
-  // Asumsi Anda akan membuat Box tambahan untuk Section dan Draft Lokal
-  Box get _sectionBox => Hive.box('sections_box');
+  // Inject the AuthService instead of reading the session box directly!
+  final AuthService _authService;
+  ArticleController({required AuthService authService})
+    : _authService = authService;
 
-  // --- READ ENDPOINTS ---
+  Box<ArticleModel> get _articlesBox => Hive.box<ArticleModel>('article_box');
+  Box<RevisionHistoryModel> get _revisionBox =>
+      Hive.box<RevisionHistoryModel>('revision_history_box');
+
+  UserRole getCurrentUserRole() {
+    final sessionBox = Hive.box('session_box');
+    final loggedInName = sessionBox.get('logged_in_user');
+    final usersBox = Hive.box<UserModel>('user_box');
+    for (final user in usersBox.values) {
+      if (user.name == loggedInName) {
+        return user.role;
+      }
+    }
+    return UserRole.reader;
+  }
 
   ArticleModel? getArticle(String articleId) => _articlesBox.get(articleId);
 
-  /// Mengambil artikel berdasarkan Section (Kategori baru di ERD)
-  List<ArticleModel> getArticlesBySection(String sectionId) {
-    return _articlesBox.values
-        .where((article) => article.sectionId == sectionId && article.status == ArticleStatus.published)
-        .toList();
+  List<ArticleModel> getLatestArticles({int limit = 10}) {
+    final publishedArticles =
+        _articlesBox.values
+            .where((article) => article.status == ArticleStatus.published)
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    return publishedArticles.take(limit).toList();
   }
 
-  List<ArticleModel> getLatestArticles() {
+  void createDraft({
+    required String title,
+    required String content,
+    required String sectionId,
+  }) {
+    final currentUserId = _authService.getCurrentUserId();
+
+    if (currentUserId == null) return;
+
+    final newArticle = ArticleModel(
+      articleId: _uuid.v4(),
+      title: title,
+      content: content,
+      sectionId: sectionId,
+      authorId: currentUserId,
+      editorId: null,
+      status: ArticleStatus.draft,
+      createdAt: DateTime.now(),
+    );
+
+    _articlesBox.put(newArticle.articleId, newArticle);
+  }
+
+  List<ArticleModel> getLatestArticlesBySection(String sectionId) {
     return _articlesBox.values
-        .where((article) => article.status == ArticleStatus.published)
+        .where(
+          (article) =>
+              article.status == ArticleStatus.published &&
+              article.sectionId == sectionId,
+        )
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt))
+      ..take(_latestArticlesLimit);
+  }
+
+  List<ArticleModel> getPendingArticles() {
+    return _articlesBox.values
+        .where((article) => article.status == ArticleStatus.pending)
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
-  // --- WORKFLOW: WRITER (LOCAL_DRAFT) ---
-
-  /// Tahap 1: Simpan ke LOCAL_DRAFT
-  /// Sesuai ERD, LOCAL_DRAFT menyimpan draf sebelum sinkronisasi ke tabel ARTICLE utama.
-  void saveLocalDraft({
+  void saveDraft({
     required String title,
     required String content,
     required String sectionId,
-    required String userId,
+    required String authorId,
   }) {
     final String articleId = _uuid.v4();
-    
-    final newArticle = ArticleModel(
-      id: articleId,
-      title: title,
-      content: content,
-      sectionId: sectionId, // Menggunakan section_id dari tabel SECTION
-      authorId: userId,
-      status: ArticleStatus.draft,
-      createdAt: DateTime.now(),
+    _articlesBox.put(
+      articleId,
+      ArticleModel(
+        articleId: articleId,
+        title: title,
+        content: content,
+        sectionId: sectionId,
+        authorId: authorId,
+        editorId: '',
+        status: ArticleStatus.draft,
+        createdAt: DateTime.now(),
+      ),
     );
-    
-    _articlesBox.put(articleId, newArticle);
-    // Logika tambahan: Di sini Anda bisa memasukkan payload ke SYNC_QUEUE 
-    // untuk sinkronisasi ke Cloud nantinya.
   }
 
-  // --- WORKFLOW: EDITOR (REVISION & REVIEW) ---
+  void submitDraft(String articleId) {
+    _updateStatus(articleId, ArticleStatus.pending);
+  }
 
-  /// Tahap 2 & 3: Keputusan Editor & Histori Revisi
-  /// Sesuai tabel REVISION_HISTORY, setiap tindakan editor harus dicatat.
-  void reviewArticle({
+  String? reviewArticle({
     required String articleId,
-    required String editorId,
     required bool approved,
-    String? note,
+    required String note, // Strictly required now
   }) {
+    // 1. The Anti-Mass-Approval Validation
+    if (note.trim().isEmpty) {
+      return "Catatan wajib diisi sebagai bukti artikel telah dibaca.";
+    }
+
     final article = getArticle(articleId);
-    if (article == null) return;
+    final currentEditorId = _authService.getCurrentUserId();
 
-    final newStatus = approved ? ArticleStatus.approved : ArticleStatus.rejected;
+    if (article == null || currentEditorId == null) {
+      return "Terjadi kesalahan sistem. Sesi tidak valid.";
+    }
 
-    // 1. Update status artikel utama
+    final newStatus = approved
+        ? ArticleStatus.approved
+        : ArticleStatus.rejected;
+
+    // 2. Update article
     _articlesBox.put(
       articleId,
       article.copyWith(
         status: newStatus,
-        editorId: editorId, // Mencatat siapa editor yang menangani
+        editorId: currentEditorId,
         rejectionNote: note,
       ),
     );
 
-    // 2. Simulasi pencatatan ke REVISION_HISTORY (Sesuai ERD)
-    _addToRevisionHistory(
+    // 3. Persist the history securely
+    _logRevision(
       articleId: articleId,
-      editorId: editorId,
+      editorId: currentEditorId,
       action: approved ? 'APPROVE' : 'REJECT',
-      note: note ?? '',
+      note: note.trim(),
     );
-  }
 
-  /// Tahap 4: Publikasi
-  void publishArticle(String articleId) {
-    final article = getArticle(articleId);
-    if (article != null && article.status == ArticleStatus.approved) {
-      _updateStatus(articleId, ArticleStatus.published);
-    }
+    return null; // Success!
   }
 
   // --- INTERNAL UTILS ---
 
-  void _updateStatus(String articleId, ArticleStatus status) {
-    final article = _articlesBox.get(articleId);
-    if (article == null) return;
-    _articlesBox.put(articleId, article.copyWith(status: status));
-  }
-
-  /// Helper untuk mencatat histori revisi sesuai ERD
-  void _addToRevisionHistory({
+  void _logRevision({
     required String articleId,
     required String editorId,
     required String action,
-    required String note,
+    required String note, // Reverted to required
   }) {
-    // Di sini Anda akan menyimpan ke Box 'revision_history_box'
-    print("Log: Revision saved for $articleId by $editorId: $action - $note");
-  }
-}
-
-// Helper Extension agar update status lebih bersih
-extension on ArticleModel {
-  ArticleModel copyWith({
-    ArticleStatus? status,
-    String? editorId,
-    String? rejectionNote,
-  }) {
-    return ArticleModel(
-      id: id,
-      title: title,
-      content: content,
-      sectionId: sectionId,
-      authorId: authorId,
-      editorId: editorId ?? this.editorId,
-      status: status ?? this.status,
-      rejectionNote: rejectionNote ?? this.rejectionNote,
-      createdAt: createdAt,
+    final revision = RevisionHistoryModel(
+      revisionId: _uuid.v4(),
+      articleId: articleId,
+      editorId: editorId,
+      action: action,
+      note: note,
     );
+
+    _revisionBox.put(revision.revisionId, revision);
+  }
+
+  void publishArticle(String articleId) {
+    final article = _articlesBox.get(articleId);
+    if (article != null && article.status == ArticleStatus.approved) {
+      _articlesBox.put(
+        articleId,
+        article.copyWith(status: ArticleStatus.published),
+      );
+    }
+  }
+
+  void archiveArticle(String articleId) {
+    _updateStatus(articleId, ArticleStatus.archived);
+  }
+
+  void deleteArticle(String articleId) {
+    _articlesBox.delete(articleId);
+  }
+
+  void _updateStatus(String articleId, ArticleStatus status) {
+    _updateArticle(articleId, (article) => article.copyWith(status: status));
+  }
+
+  void _updateArticle(
+    String articleId,
+    ArticleModel Function(ArticleModel) update,
+  ) {
+    final article = _articlesBox.get(articleId);
+    if (article == null) return;
+    _articlesBox.put(articleId, update(article));
   }
 }

@@ -21,7 +21,7 @@ class UserModelAdapter extends TypeAdapter<UserModel> {
       name: fields[1] as String,
       email: fields[2] as String,
       passwordHash: fields[3] as String,
-      role: fields[4] as String,
+      role: fields[4] as UserRole,
       createdAt: fields[5] as DateTime,
       updatedAt: fields[6] as DateTime,
     );

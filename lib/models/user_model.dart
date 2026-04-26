@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-
+import 'app_enums.dart';
 part 'user_model.g.dart';
 
 @HiveType(typeId: 2)
@@ -27,7 +27,7 @@ class UserModel {
   final String passwordHash;
 
   @HiveField(4)
-  final String role;
+  final UserRole role;
 
   @HiveField(5)
   final DateTime createdAt;

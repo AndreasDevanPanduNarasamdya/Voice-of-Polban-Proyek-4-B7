@@ -12,50 +12,28 @@ import 'section_model.dart';
 import 'sync_queue_model.dart';
 import 'user_model.dart';
 import 'vote_model.dart';
+import 'package:voice_of_polban/models/app_enums.dart';
 
 Future<void> setupHive() async {
   await Hive.initFlutter();
 
-  await Hive.deleteBoxFromDisk('users_box');
-  await Hive.deleteBoxFromDisk('articles_box');
   await Hive.openBox('session_box');
 
-  if (!Hive.isAdapterRegistered(1)) {
-    Hive.registerAdapter(SectionModelAdapter());
-  }
-  if (!Hive.isAdapterRegistered(2)) {
-    Hive.registerAdapter(UserModelAdapter());
-  }
-  if (!Hive.isAdapterRegistered(3)) {
-    Hive.registerAdapter(ArticleModelAdapter());
-  }
-  if (!Hive.isAdapterRegistered(4)) {
-    Hive.registerAdapter(CommentModelAdapter());
-  }
-  if (!Hive.isAdapterRegistered(5)) {
-    Hive.registerAdapter(AttachmentModelAdapter());
-  }
-  if (!Hive.isAdapterRegistered(6)) {
-    Hive.registerAdapter(RevisionHistoryModelAdapter());
-  }
-  if (!Hive.isAdapterRegistered(7)) {
-    Hive.registerAdapter(ArticleCacheModelAdapter());
-  }
-  if (!Hive.isAdapterRegistered(8)) {
-    Hive.registerAdapter(VoteModelAdapter());
-  }
-  if (!Hive.isAdapterRegistered(9)) {
-    Hive.registerAdapter(BookmarkModelAdapter());
-  }
-  if (!Hive.isAdapterRegistered(10)) {
-    Hive.registerAdapter(NotificationModelAdapter());
-  }
-  if (!Hive.isAdapterRegistered(11)) {
-    Hive.registerAdapter(LocalDraftModelAdapter());
-  }
-  if (!Hive.isAdapterRegistered(12)) {
-    Hive.registerAdapter(SyncQueueModelAdapter());
-  }
+  Hive.registerAdapter(UserRoleAdapter());
+  Hive.registerAdapter(ArticleStatusAdapter());
+
+  Hive.registerAdapter(UserModelAdapter());
+  Hive.registerAdapter(ArticleModelAdapter());
+  Hive.registerAdapter(SectionModelAdapter());
+  Hive.registerAdapter(CommentModelAdapter());
+  Hive.registerAdapter(AttachmentModelAdapter());
+  Hive.registerAdapter(RevisionHistoryModelAdapter());
+  Hive.registerAdapter(ArticleCacheModelAdapter());
+  Hive.registerAdapter(VoteModelAdapter());
+  Hive.registerAdapter(BookmarkModelAdapter());
+  Hive.registerAdapter(NotificationModelAdapter());
+  Hive.registerAdapter(LocalDraftModelAdapter());
+  Hive.registerAdapter(SyncQueueModelAdapter());
 
   await Hive.openBox<SectionModel>('section_box');
   await Hive.openBox<UserModel>('user_box');

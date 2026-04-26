@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 
 part 'attachment_model.g.dart';
 
-@HiveType(typeId: 5)
+@HiveType(typeId: 14)
 class AttachmentModel {
   const AttachmentModel({
     required this.attachmentId,

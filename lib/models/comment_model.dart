@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 
 part 'comment_model.g.dart';
 
-@HiveType(typeId: 4)
+@HiveType(typeId: 15)
 class CommentModel {
   const CommentModel({
     required this.commentId,

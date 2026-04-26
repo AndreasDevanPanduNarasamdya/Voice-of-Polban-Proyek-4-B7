@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:voice_of_polban/view/writer_view.dart';
+import 'package:voice_of_polban/auth/auth_view.dart';
 import '../models/app_enums.dart';
 
 class AppSidebar extends StatelessWidget {
@@ -9,42 +10,43 @@ class AppSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Drawer(
+      backgroundColor: const Color(0xFF121212), // Match Dark Theme
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
           const DrawerHeader(
-            decoration: BoxDecoration(color: Colors.deepPurple),
+            decoration: BoxDecoration(color: Colors.black),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Icon(Icons.account_circle, size: 48, color: Colors.white),
+                CircleAvatar(
+                  radius: 24,
+                  backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
+                ),
                 SizedBox(height: 10),
                 Text(
                   'Menu Navigasi',
-                  style: TextStyle(color: Colors.white, fontSize: 24),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.book),
-            title: const Text('Catatan Logbook'),
-            onTap: () {
-              Navigator.pop(context);
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.save),
-            title: const Text('Data Persistence'),
-            onTap: () {
-              Navigator.pop(context);
-            },
-          ),
-          if (currentUserRole == UserRole.writer)
+          _buildTile(context, Icons.book, 'Catatan Logbook'),
+          _buildTile(context, Icons.save, 'Data Persistence'),
+
+          if (currentUserRole == UserRole.writer ||
+              currentUserRole == UserRole.editor)
             ListTile(
-              leading: const Icon(Icons.edit_document),
-              title: const Text('Tulis Artikel'),
+              leading: const Icon(Icons.edit_document, color: Colors.white),
+              title: const Text(
+                'Tulis Artikel',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -53,16 +55,36 @@ class AppSidebar extends StatelessWidget {
                 );
               },
             ),
-          const Divider(),
+
+          const Divider(color: Color(0xFF333333)),
+          _buildTile(context, Icons.settings, 'Pengaturan'),
+
+          // Sign Out Logic
           ListTile(
-            leading: const Icon(Icons.settings),
-            title: const Text('Pengaturan'),
+            leading: const Icon(Icons.logout, color: Colors.redAccent),
+            title: const Text(
+              'Keluar',
+              style: TextStyle(color: Colors.redAccent),
+            ),
             onTap: () {
               Navigator.pop(context);
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginView()),
+                (route) => false,
+              );
             },
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildTile(BuildContext context, IconData icon, String title) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.white),
+      title: Text(title, style: const TextStyle(color: Colors.white)),
+      onTap: () => Navigator.pop(context),
     );
   }
 }

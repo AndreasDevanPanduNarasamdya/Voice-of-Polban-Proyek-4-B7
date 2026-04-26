@@ -22,8 +22,8 @@ class ArticleModelAdapter extends TypeAdapter<ArticleModel> {
       content: fields[2] as String,
       sectionId: fields[3] as String,
       authorId: fields[4] as String,
-      editorId: fields[5] as String,
-      status: fields[6] as String,
+      editorId: fields[5] as String?,
+      status: fields[6] as ArticleStatus,
       rejectionNote: fields[7] as String?,
       createdAt: fields[8] as DateTime,
     );
