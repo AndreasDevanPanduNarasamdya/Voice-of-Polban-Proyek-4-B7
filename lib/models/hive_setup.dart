@@ -9,6 +9,7 @@ Future<void> setupHive() async {
 
   await Hive.deleteBoxFromDisk('users_box');
   await Hive.deleteBoxFromDisk('articles_box');
+  await Hive.openBox('session_box');
 
   if (!Hive.isAdapterRegistered(1)) {
     Hive.registerAdapter(UserRoleAdapter());

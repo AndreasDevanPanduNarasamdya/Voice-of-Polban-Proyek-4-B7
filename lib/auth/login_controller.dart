@@ -11,6 +11,7 @@ class LoginController {
   UserModel? login(String username, String password) {
     for (final user in _usersBox.values) {
       if (user.name == username && user.password == password) {
+        Hive.box('session_box').put('logged_in_user', user.name);
         print("Logged in as: ${user.role}");
         return user;
       }
