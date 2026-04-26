@@ -1,8 +1,17 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
-import 'app_enums.dart';
+import 'article_cache_model.dart';
 import 'article_model.dart';
+import 'attachment_model.dart';
+import 'bookmark_model.dart';
+import 'comment_model.dart';
+import 'local_draft_model.dart';
+import 'notification_model.dart';
+import 'revision_history_model.dart';
+import 'section_model.dart';
+import 'sync_queue_model.dart';
 import 'user_model.dart';
+import 'vote_model.dart';
 
 Future<void> setupHive() async {
   await Hive.initFlutter();
@@ -12,134 +21,52 @@ Future<void> setupHive() async {
   await Hive.openBox('session_box');
 
   if (!Hive.isAdapterRegistered(1)) {
-    Hive.registerAdapter(UserRoleAdapter());
+    Hive.registerAdapter(SectionModelAdapter());
   }
   if (!Hive.isAdapterRegistered(2)) {
-    Hive.registerAdapter(ArticleStatusAdapter());
-  }
-  if (!Hive.isAdapterRegistered(3)) {
-    Hive.registerAdapter(ArticleCategoryAdapter());
-  }
-  if (!Hive.isAdapterRegistered(4)) {
     Hive.registerAdapter(UserModelAdapter());
   }
-  if (!Hive.isAdapterRegistered(5)) {
+  if (!Hive.isAdapterRegistered(3)) {
     Hive.registerAdapter(ArticleModelAdapter());
   }
-
-  await Hive.openBox<UserModel>('users_box');
-  await Hive.openBox<ArticleModel>('articles_box');
-
-  final box = Hive.box<UserModel>('users_box');
-
-  if (box.isEmpty) {
-    print("Users box is empty. Seeding generic accounts...");
-
-    final editor = UserModel(
-      id: 'usr_editor',
-      name: 'Chief Editor',
-      email: 'editor',
-      password: 'password123',
-      role: UserRole.editor,
-    );
-
-    final writer = UserModel(
-      id: 'usr_writer',
-      name: 'Staff Writer',
-      email: 'writer',
-      password: 'password123',
-      role: UserRole.writer,
-    );
-
-    final reader = UserModel(
-      id: 'usr_reader',
-      name: 'Student Reader',
-      email: 'reader',
-      password: 'password123',
-      role: UserRole.reader,
-    );
-
-    await box.put(editor.id, editor);
-    await box.put(writer.id, writer);
-    await box.put(reader.id, reader);
-
-    print("Generic users injected successfully!");
-  } else {
-    print("Users already exist. Skipping seed.");
+  if (!Hive.isAdapterRegistered(4)) {
+    Hive.registerAdapter(CommentModelAdapter());
   }
-}
-
-Future<void> seedInitialUsers() async {
-  final box = Hive.box<UserModel>('users_box');
-
-  if (box.isEmpty) {
-    print("Users box is empty. Seeding generic accounts...");
-
-    final editor = UserModel(
-      id: 'usr_editor',
-      name: 'Chief Editor',
-      email: 'editor',
-      password: 'password123',
-      role: UserRole.editor,
-    );
-
-    final writer = UserModel(
-      id: 'usr_writer',
-      name: 'Staff Writer',
-      email: 'writer',
-      password: 'password123',
-      role: UserRole.writer,
-    );
-
-    final reader = UserModel(
-      id: 'usr_reader',
-      name: 'Student Reader',
-      email: 'reader',
-      password: 'password123',
-      role: UserRole.reader,
-    );
-
-    await box.put(editor.id, editor);
-    await box.put(writer.id, writer);
-    await box.put(reader.id, reader);
-
-    print("Generic users injected successfully!");
-  } else {
-    print("Users already exist. Skipping seed.");
+  if (!Hive.isAdapterRegistered(5)) {
+    Hive.registerAdapter(AttachmentModelAdapter());
   }
-}
-
-// 4. MOVED OUTSIDE: This is now a standalone function
-Future<void> seedInitialArticles() async {
-  final box = Hive.box<ArticleModel>('articles_box');
-
-  if (box.isEmpty) {
-    print("Articles box is empty. Seeding dummy articles...");
-
-    final article1 = ArticleModel(
-      id: 'art_001',
-      title: 'Berita Utama MetroPolban',
-      content:
-          'Ini adalah teks isi artikel. Bayangkan ini berisi banyak paragraf penting mengenai perkembangan kampus.',
-      category: ArticleCategory.beritaKampus,
-      authorId: 'usr_writer',
-      status: ArticleStatus.published,
-      createdAt: DateTime.now(),
-    );
-
-    final article2 = ArticleModel(
-      id: 'art_002',
-      title: 'Review Makanan Kantin Baru',
-      content: 'Ayam geprek di kantin baru ternyata sangat direkomendasikan.',
-      category: ArticleCategory.ormawa,
-      authorId: 'usr_writer',
-      status: ArticleStatus.pending,
-      createdAt: DateTime.now(),
-    );
-
-    await box.put(article1.id, article1);
-    await box.put(article2.id, article2);
-
-    print("Dummy articles injected successfully!");
+  if (!Hive.isAdapterRegistered(6)) {
+    Hive.registerAdapter(RevisionHistoryModelAdapter());
   }
+  if (!Hive.isAdapterRegistered(7)) {
+    Hive.registerAdapter(ArticleCacheModelAdapter());
+  }
+  if (!Hive.isAdapterRegistered(8)) {
+    Hive.registerAdapter(VoteModelAdapter());
+  }
+  if (!Hive.isAdapterRegistered(9)) {
+    Hive.registerAdapter(BookmarkModelAdapter());
+  }
+  if (!Hive.isAdapterRegistered(10)) {
+    Hive.registerAdapter(NotificationModelAdapter());
+  }
+  if (!Hive.isAdapterRegistered(11)) {
+    Hive.registerAdapter(LocalDraftModelAdapter());
+  }
+  if (!Hive.isAdapterRegistered(12)) {
+    Hive.registerAdapter(SyncQueueModelAdapter());
+  }
+
+  await Hive.openBox<SectionModel>('section_box');
+  await Hive.openBox<UserModel>('user_box');
+  await Hive.openBox<ArticleModel>('article_box');
+  await Hive.openBox<CommentModel>('comment_box');
+  await Hive.openBox<AttachmentModel>('attachment_box');
+  await Hive.openBox<RevisionHistoryModel>('revision_history_box');
+  await Hive.openBox<ArticleCacheModel>('article_cache_box');
+  await Hive.openBox<VoteModel>('vote_box');
+  await Hive.openBox<BookmarkModel>('bookmark_box');
+  await Hive.openBox<NotificationModel>('notification_box');
+  await Hive.openBox<LocalDraftModel>('local_draft_box');
+  await Hive.openBox<SyncQueueModel>('sync_queue_box');
 }

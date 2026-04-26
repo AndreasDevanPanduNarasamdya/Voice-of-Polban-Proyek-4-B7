@@ -8,7 +8,7 @@ part of 'article_model.dart';
 
 class ArticleModelAdapter extends TypeAdapter<ArticleModel> {
   @override
-  final int typeId = 5;
+  final int typeId = 3;
 
   @override
   ArticleModel read(BinaryReader reader) {
@@ -17,36 +17,39 @@ class ArticleModelAdapter extends TypeAdapter<ArticleModel> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return ArticleModel(
-      id: fields[0] as String,
+      articleId: fields[0] as String,
       title: fields[1] as String,
       content: fields[2] as String,
-      category: fields[3] as ArticleCategory,
+      sectionId: fields[3] as String,
       authorId: fields[4] as String,
-      status: fields[5] as ArticleStatus,
-      rejectionNote: fields[6] as String?,
-      createdAt: fields[7] as DateTime,
+      editorId: fields[5] as String,
+      status: fields[6] as String,
+      rejectionNote: fields[7] as String?,
+      createdAt: fields[8] as DateTime,
     );
   }
 
   @override
   void write(BinaryWriter writer, ArticleModel obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
-      ..write(obj.id)
+      ..write(obj.articleId)
       ..writeByte(1)
       ..write(obj.title)
       ..writeByte(2)
       ..write(obj.content)
       ..writeByte(3)
-      ..write(obj.category)
+      ..write(obj.sectionId)
       ..writeByte(4)
       ..write(obj.authorId)
       ..writeByte(5)
-      ..write(obj.status)
+      ..write(obj.editorId)
       ..writeByte(6)
-      ..write(obj.rejectionNote)
+      ..write(obj.status)
       ..writeByte(7)
+      ..write(obj.rejectionNote)
+      ..writeByte(8)
       ..write(obj.createdAt);
   }
 

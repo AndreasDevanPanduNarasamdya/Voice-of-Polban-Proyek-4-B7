@@ -1,21 +1,21 @@
 import 'package:hive/hive.dart';
 
-import 'app_enums.dart';
-
 part 'user_model.g.dart';
 
-@HiveType(typeId: 4)
+@HiveType(typeId: 2)
 class UserModel {
   const UserModel({
-    required this.id,
+    required this.userId,
     required this.name,
     required this.email,
-    required this.password,
+    required this.passwordHash,
     required this.role,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   @HiveField(0)
-  final String id;
+  final String userId;
 
   @HiveField(1)
   final String name;
@@ -24,8 +24,14 @@ class UserModel {
   final String email;
 
   @HiveField(3)
-  final String password;
+  final String passwordHash;
 
   @HiveField(4)
-  final UserRole role;
+  final String role;
+
+  @HiveField(5)
+  final DateTime createdAt;
+
+  @HiveField(6)
+  final DateTime updatedAt;
 }
