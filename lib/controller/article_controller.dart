@@ -12,23 +12,21 @@ class ArticleController {
 
   // Inject the AuthService instead of reading the session box directly!
   final AuthService _authService;
+
   ArticleController({required AuthService authService})
     : _authService = authService;
 
   Box<ArticleModel> get _articlesBox => Hive.box<ArticleModel>('article_box');
+
   Box<RevisionHistoryModel> get _revisionBox =>
       Hive.box<RevisionHistoryModel>('revision_history_box');
 
   UserRole getCurrentUserRole() {
-    final sessionBox = Hive.box('session_box');
-    final loggedInName = sessionBox.get('logged_in_user');
-    final usersBox = Hive.box<UserModel>('user_box');
-    for (final user in usersBox.values) {
-      if (user.name == loggedInName) {
-        return user.role;
-      }
-    }
-    return UserRole.reader;
+    final userId = _authService.getCurrentUserId();
+    if (userId == null) return UserRole.reader;
+
+    final user = Hive.box<UserModel>('user_box').get(userId);
+    return user?.role ?? UserRole.reader;
   }
 
   ArticleModel? getArticle(String articleId) => _articlesBox.get(articleId);
@@ -80,7 +78,11 @@ class ArticleController {
 
   List<ArticleModel> getPendingArticles() {
     return _articlesBox.values
-        .where((article) => article.status == ArticleStatus.pending)
+        .where(
+          (a) =>
+              a.status == ArticleStatus.pending ||
+              a.status == ArticleStatus.draft,
+        )
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
@@ -173,13 +175,15 @@ class ArticleController {
   }
 
   void publishArticle(String articleId) {
+    if (!isEditor()) return;
+
     final article = _articlesBox.get(articleId);
-    if (article != null && article.status == ArticleStatus.approved) {
-      _articlesBox.put(
-        articleId,
-        article.copyWith(status: ArticleStatus.published),
-      );
-    }
+    if (article == null) return;
+
+    _articlesBox.put(
+      articleId,
+      article.copyWith(status: ArticleStatus.published),
+    );
   }
 
   void archiveArticle(String articleId) {
@@ -201,5 +205,9 @@ class ArticleController {
     final article = _articlesBox.get(articleId);
     if (article == null) return;
     _articlesBox.put(articleId, update(article));
+  }
+
+  bool isEditor() {
+    return getCurrentUserRole() == UserRole.editor;
   }
 }

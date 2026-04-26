@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:voice_of_polban/view/writer_view.dart';
 import 'package:voice_of_polban/auth/auth_view.dart';
+import 'package:voice_of_polban/view/editor_view.dart';
 import '../models/app_enums.dart';
 
 class AppSidebar extends StatelessWidget {
@@ -39,8 +40,8 @@ class AppSidebar extends StatelessWidget {
           _buildTile(context, Icons.book, 'Catatan Logbook'),
           _buildTile(context, Icons.save, 'Data Persistence'),
 
-          if (currentUserRole == UserRole.writer ||
-              currentUserRole == UserRole.editor)
+          // WRITER → Tulis Artikel
+          if (currentUserRole == UserRole.writer)
             ListTile(
               leading: const Icon(Icons.edit_document, color: Colors.white),
               title: const Text(
@@ -52,6 +53,23 @@ class AppSidebar extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const WriterPage()),
+                );
+              },
+            ),
+
+          // EDITOR → Lihat Draft
+          if (currentUserRole == UserRole.editor)
+            ListTile(
+              leading: const Icon(Icons.edit_document, color: Colors.white),
+              title: const Text(
+                'Lihat Draft',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const EditorPage()),
                 );
               },
             ),
