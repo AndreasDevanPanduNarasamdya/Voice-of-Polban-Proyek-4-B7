@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../controller/article_controller.dart';
+import '../auth/auth_service.dart';
 
 class WriterPage extends StatefulWidget {
   const WriterPage({super.key});
@@ -8,18 +10,29 @@ class WriterPage extends StatefulWidget {
 }
 
 class _WriterPageState extends State<WriterPage> {
-  static const Color _bgColor = Color(0xFF1A1A2E);
-  static const Color _cardColor = Color(0xFF16213E);
-  static const Color _accentColor = Color(0xFF0F3460);
-  static const Color _highlightColor = Color(0xFFE94560);
+  // 1. Core Architecture Integrations
+  final AuthService _authService = AuthService();
+  late final ArticleController _articleController;
 
+  // 2. Form State Controllers
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
-  String? _selectedCategory;
-  String? _frontImagePath;
-  String? _contentImagePath;
+  String? _selectedSectionId;
 
-  final List<String> _categories = ['Umum', 'Lomba', 'Event', 'Ormawa'];
+  // 3. Mock Sections (Usually fetched from a SectionBox in Hive)
+  final List<Map<String, String>> _sections = [
+    {'id': 'sec_akademik', 'name': 'Akademik'},
+    {'id': 'sec_kampus', 'name': 'Kampus'},
+    {'id': 'sec_acara', 'name': 'Acara'},
+    {'id': 'sec_organisasi', 'name': 'Organisasi'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Inject the Auth Service into the Article Controller
+    _articleController = ArticleController(authService: _authService);
+  }
 
   @override
   void dispose() {
@@ -28,178 +41,233 @@ class _WriterPageState extends State<WriterPage> {
     super.dispose();
   }
 
-  InputDecoration _fieldDecoration(String hint) => InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white38),
-        filled: true,
-        fillColor: _accentColor.withOpacity(0.3),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: _accentColor.withOpacity(0.6)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: _accentColor.withOpacity(0.5)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: _highlightColor, width: 1.5),
+  void _submitDraft() {
+    final title = _titleController.text.trim();
+    final content = _contentController.text.trim();
+
+    // Validation
+    if (title.isEmpty || content.isEmpty || _selectedSectionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Judul, Isi, dan Kategori wajib diisi!"),
+          backgroundColor: Colors.red,
         ),
       );
+      return;
+    }
 
-  Widget _imagePicker(String label, String? path, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 140,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: _accentColor.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: _accentColor.withOpacity(0.5)),
-        ),
-        child: path != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.asset(path, fit: BoxFit.cover),
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.add_photo_alternate_outlined,
-                      color: Colors.white38, size: 36),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: _accentColor,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: _highlightColor.withOpacity(0.5)),
-                    ),
-                    child: Text(label,
-                        style:
-                            const TextStyle(color: Colors.white70, fontSize: 13)),
-                  ),
-                ],
-              ),
+    // Call the Domain Controller
+    _articleController.createDraft(
+      title: title,
+      content: content,
+      sectionId: _selectedSectionId!,
+    );
+
+    // Give UX feedback and return to feed
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Draf berhasil disimpan!"),
+        backgroundColor: Colors.green,
       ),
     );
+    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bgColor,
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: _cardColor,
+        backgroundColor: const Color(0xFF121212),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFFFF8C00)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 24,
-              height: 24,
-              decoration: const BoxDecoration(color: _highlightColor, shape: BoxShape.circle),
-              child: const Icon(Icons.campaign, color: Colors.white, size: 14),
-            ),
-            const SizedBox(width: 8),
-            const Text('Voice of Polban',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-          ],
+        title: const Text(
+          "VOP",
+          style: TextStyle(
+            color: Color(0xFF000080),
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2,
+          ),
         ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Judul field
-            TextField(
-              controller: _titleController,
-              style: const TextStyle(color: Colors.white),
-              decoration: _fieldDecoration('Masukkan Judul'),
-            ),
-            const SizedBox(height: 16),
-
-            // Gambar depan
-            _imagePicker('Tambah Gambar Depan', _frontImagePath, () {
-              // TODO: implementasi image picker
-            }),
-            const SizedBox(height: 16),
-
-            // Isi artikel
-            TextField(
-              controller: _contentController,
-              maxLines: 7,
-              style: const TextStyle(color: Colors.white),
-              decoration: _fieldDecoration('Tambah Isi').copyWith(
-                alignLabelWithHint: true,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // --- TITLE FIELD ---
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: _accentColor.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: _highlightColor.withOpacity(0.4)),
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text('Pratinjau Isi',
-                    style: TextStyle(color: _highlightColor, fontSize: 11)),
+                child: TextField(
+                  controller: _titleController, // Bound to controller
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText: "Masukkan Judul",
+                    hintStyle: TextStyle(color: Colors.grey),
+                    border: InputBorder.none,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Kategori dropdown
-            DropdownButtonFormField<String>(
-              value: _selectedCategory,
-              dropdownColor: _cardColor,
-              style: const TextStyle(color: Colors.white),
-              decoration: _fieldDecoration('').copyWith(
-                hintText: null,
-                labelText: 'Kategori',
-                labelStyle: const TextStyle(color: Colors.white54),
-              ),
-              items: _categories
-                  .map((c) => DropdownMenuItem(
-                        value: c,
-                        child: Text(c, style: const TextStyle(color: Colors.white)),
-                      ))
-                  .toList(),
-              onChanged: (val) => setState(() => _selectedCategory = val),
-            ),
-            const SizedBox(height: 28),
-
-            // Tombol Submit
-            SizedBox(
-              height: 48,
-              child: ElevatedButton(
-                onPressed: () {
-                  // TODO: submit artikel
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Artikel berhasil dikirim!'),
-                      backgroundColor: Color(0xFF0F3460),
+              // --- IMAGE UPLOAD (Placeholder) ---
+              Container(
+                height: 180,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Tambah Gambar Depan",
+                      style: TextStyle(color: Colors.grey, fontSize: 16),
                     ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _highlightColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  elevation: 0,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(
+                            Icons.insert_drive_file_outlined,
+                            size: 12,
+                            color: Colors.black,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            "Tambah Gambar",
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                child: const Text('Submit',
+              ),
+              const SizedBox(height: 16),
+
+              // --- CONTENT FIELD (Fixed UI/UX) ---
+              Container(
+                height: 250,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TextField(
+                  controller: _contentController, // Bound to controller
+                  maxLines: null, // Allows multiline wrapping
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText:
+                        "Tulis isi artikel di sini...", // Fixed overlapping UX
+                    hintStyle: TextStyle(color: Colors.grey),
+                    border: InputBorder.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // --- CATEGORY DROPDOWN (Now Dynamic!) ---
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    dropdownColor: const Color(0xFF1E1E1E),
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down,
+                      color: Colors.white,
+                    ),
+                    isExpanded: true,
+                    value: _selectedSectionId,
+                    hint: const Text(
+                      "Pilih Kategori",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    items: _sections.map((section) {
+                      return DropdownMenuItem<String>(
+                        value: section['id'],
+                        child: Text(
+                          section['name']!,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedSectionId = newValue;
+                      });
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // --- SUBMIT BUTTON ---
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton.icon(
+                  onPressed: _submitDraft, // Trigger the submission
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E1E1E),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  label: const Text(
+                    "Submit ke draf",
                     style: TextStyle(
-                        color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  icon: const Icon(
+                    Icons.send_outlined,
+                    color: Color(0xFFFF8C00),
+                    size: 18,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 20),
