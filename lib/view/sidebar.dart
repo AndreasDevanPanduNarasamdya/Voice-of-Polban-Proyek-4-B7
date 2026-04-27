@@ -37,8 +37,8 @@ class AppSidebar extends StatelessWidget {
               ],
             ),
           ),
-          _buildTile(context, Icons.book, 'Catatan Logbook'),
-          _buildTile(context, Icons.save, 'Data Persistence'),
+          _buildTile(context, Icons.book, 'Artikel Tersimpan'),
+          _buildTile(context, Icons.save, 'Ketentuan Layanan'),
 
           // WRITER → Tulis Artikel
           if (currentUserRole == UserRole.writer)
