@@ -16,7 +16,8 @@ class PostController {
   final Uuid _uuid = const Uuid();
 
   Box<LocalDraft> get _draftBox => Hive.box<LocalDraft>(_draftBoxName);
-  Box<CachedPost> get _cachedPostsBox => Hive.box<CachedPost>(_cachedPostsBoxName);
+  Box<CachedPost> get _cachedPostsBox =>
+      Hive.box<CachedPost>(_cachedPostsBoxName);
   Box<SyncQueue> get _queueBox => Hive.box<SyncQueue>(_queueBoxName);
 
   LocalDraft saveDraft(String title, String content, String userId) {
