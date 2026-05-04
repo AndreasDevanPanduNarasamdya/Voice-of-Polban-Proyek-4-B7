@@ -1,36 +1,34 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'user_model.dart';
+part of 'cached_user.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class UserModelAdapter extends TypeAdapter<UserModel> {
+class CachedUserAdapter extends TypeAdapter<CachedUser> {
   @override
-  final int typeId = 2;
+  final int typeId = 7;
 
   @override
-  UserModel read(BinaryReader reader) {
+  CachedUser read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return UserModel(
+    return CachedUser(
       userId: fields[0] as String,
       name: fields[1] as String,
       email: fields[2] as String,
-      passwordHash: fields[3] as String,
-      role: fields[4] as UserRole,
-      createdAt: fields[5] as DateTime,
-      updatedAt: fields[6] as DateTime,
+      role: fields[3] as UserRole,
+      avatarUrl: fields[4] as String,
     );
   }
 
   @override
-  void write(BinaryWriter writer, UserModel obj) {
+  void write(BinaryWriter writer, CachedUser obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(5)
       ..writeByte(0)
       ..write(obj.userId)
       ..writeByte(1)
@@ -38,13 +36,9 @@ class UserModelAdapter extends TypeAdapter<UserModel> {
       ..writeByte(2)
       ..write(obj.email)
       ..writeByte(3)
-      ..write(obj.passwordHash)
-      ..writeByte(4)
       ..write(obj.role)
-      ..writeByte(5)
-      ..write(obj.createdAt)
-      ..writeByte(6)
-      ..write(obj.updatedAt);
+      ..writeByte(4)
+      ..write(obj.avatarUrl);
   }
 
   @override
@@ -53,7 +47,7 @@ class UserModelAdapter extends TypeAdapter<UserModel> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is UserModelAdapter &&
+      other is CachedUserAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

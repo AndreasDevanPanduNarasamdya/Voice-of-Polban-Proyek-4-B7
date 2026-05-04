@@ -1,24 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:voice_of_polban/view/home_view.dart';
-import 'auth/auth_view.dart';
+import 'screens/debug_dashboard.dart';
 import 'models/hive_setup.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await setupHive();
-  final sessionBox = Hive.box('session_box');
-  final String? activeUserId = sessionBox.get('logged_in_user_id');
-  final bool isLoggedIn = activeUserId != null;
-
-  runApp(VoiceOfPolbanApp(isLoggedIn: isLoggedIn));
+  runApp(const VoiceOfPolbanApp());
 }
 
 class VoiceOfPolbanApp extends StatelessWidget {
-  final bool isLoggedIn;
-
-  const VoiceOfPolbanApp({super.key, required this.isLoggedIn});
+  const VoiceOfPolbanApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +32,7 @@ class VoiceOfPolbanApp extends StatelessWidget {
         ),
       ),
 
-      home: isLoggedIn ? const HomePage() : const LoginView(),
+      home: const DebugDashboard(),
     );
   }
 }

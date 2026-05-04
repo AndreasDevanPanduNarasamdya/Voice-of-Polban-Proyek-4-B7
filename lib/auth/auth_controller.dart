@@ -1,56 +1,84 @@
-import 'package:voice_of_polban/models/app_enums.dart';
-import 'auth_service.dart';
+import 'package:hive/hive.dart';
+
+import '../models/app_enums.dart';
+import '../models/cached_user.dart';
 
 class AuthController {
-  final AuthService _authService = AuthService();
-  final RegExp _emailRegex = RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$');
+  static const String _usersBoxName = 'cached_user_box';
 
-  String? login(String input, String password) {
-    if (input.trim().isEmpty || password.trim().isEmpty) {
-      return "Kolom tidak boleh kosong";
-    }
+  CachedUser? _currentUser;
 
-    final result = _authService.login(input.trim(), password.trim());
+  Box<CachedUser> get _usersBox => Hive.box<CachedUser>(_usersBoxName);
 
-    switch (result) {
-      case AuthResult.success:
-        return null;
-      case AuthResult.userNotFound:
-        return "Akun tidak ditemukan. Silakan daftar terlebih dahulu.";
-      case AuthResult.wrongPassword:
-        return "Kata sandi salah.";
+  CachedUser? get currentUser => _currentUser;
+
+  Future<void> seedDummyUsers() async {
+    final users = <CachedUser>[
+      CachedUser(
+        userId: '1',
+        name: 'Reader',
+        email: 'reader@polban.ac.id',
+        role: UserRole.reader,
+        avatarUrl: '',
+      ),
+      CachedUser(
+        userId: '2',
+        name: 'Writer',
+        email: 'writer@polban.ac.id',
+        role: UserRole.writer,
+        avatarUrl: '',
+      ),
+      CachedUser(
+        userId: '3',
+        name: 'Editor',
+        email: 'editor@polban.ac.id',
+        role: UserRole.editor,
+        avatarUrl: '',
+      ),
+    ];
+
+    for (final user in users) {
+      await _usersBox.put(user.userId, user);
     }
   }
 
-  String? register(
-    String name,
-    String email,
-    String password, {
-    UserRole role = UserRole.reader,
-  }) {
-    if (name.trim().isEmpty ||
-        email.trim().isEmpty ||
-        password.trim().isEmpty) {
-      return "Semua kolom wajib diisi";
+  CachedUser? login(String input, String password) {
+    final normalizedInput = input.trim().toLowerCase();
+    final normalizedPassword = password.trim();
+
+    if (normalizedInput.isEmpty || normalizedPassword.isEmpty) {
+      return null;
     }
 
-    if (!_emailRegex.hasMatch(email.trim())) {
-      return "Format email tidak valid";
+    if (normalizedPassword != 'password123') {
+      return null;
     }
 
-    if (password.length < 6) {
-      return "Kata sandi minimal 6 karakter";
-    }
-
-    return _authService.register(
-      name: name.trim(),
-      email: email.trim(),
-      password: password.trim(),
-      role: role,
+    final matchedUser = _usersBox.values.firstWhere(
+      (user) =>
+          user.email.toLowerCase() == normalizedInput ||
+          user.name.toLowerCase() == normalizedInput ||
+          user.role.name.toLowerCase() == normalizedInput,
+      orElse: () => CachedUser(
+        userId: '',
+        name: '',
+        email: '',
+        role: UserRole.reader,
+        avatarUrl: '',
+      ),
     );
+
+    if (matchedUser.userId.isEmpty) {
+      return null;
+    }
+
+    _currentUser = matchedUser;
+    return matchedUser;
   }
 
-  void logout() {
-    _authService.logout();
+  CachedUser? logout() {
+    final previousUser = _currentUser;
+    _currentUser = null;
+    return previousUser;
   }
 }

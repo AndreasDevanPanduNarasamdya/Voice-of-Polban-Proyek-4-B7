@@ -1,41 +1,50 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'bookmark_model.dart';
+part of 'local_draft.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class BookmarkModelAdapter extends TypeAdapter<BookmarkModel> {
+class LocalDraftAdapter extends TypeAdapter<LocalDraft> {
   @override
-  final int typeId = 9;
+  final int typeId = 1;
 
   @override
-  BookmarkModel read(BinaryReader reader) {
+  LocalDraft read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return BookmarkModel(
-      bookmarkId: fields[0] as String,
-      articleId: fields[1] as String,
+    return LocalDraft(
+      localId: fields[0] as String,
+      postId: fields[1] as String,
       userId: fields[2] as String,
-      isSynced: fields[3] as bool,
+      title: fields[3] as String,
+      content: fields[4] as String,
+      status: fields[5] as PostStatus,
+      updatedAt: fields[6] as DateTime,
     );
   }
 
   @override
-  void write(BinaryWriter writer, BookmarkModel obj) {
+  void write(BinaryWriter writer, LocalDraft obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(7)
       ..writeByte(0)
-      ..write(obj.bookmarkId)
+      ..write(obj.localId)
       ..writeByte(1)
-      ..write(obj.articleId)
+      ..write(obj.postId)
       ..writeByte(2)
       ..write(obj.userId)
       ..writeByte(3)
-      ..write(obj.isSynced);
+      ..write(obj.title)
+      ..writeByte(4)
+      ..write(obj.content)
+      ..writeByte(5)
+      ..write(obj.status)
+      ..writeByte(6)
+      ..write(obj.updatedAt);
   }
 
   @override
@@ -44,7 +53,7 @@ class BookmarkModelAdapter extends TypeAdapter<BookmarkModel> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is BookmarkModelAdapter &&
+      other is LocalDraftAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

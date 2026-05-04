@@ -1,41 +1,44 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'article_cache_model.dart';
+part of 'local_vote.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class ArticleCacheModelAdapter extends TypeAdapter<ArticleCacheModel> {
+class LocalVoteAdapter extends TypeAdapter<LocalVote> {
   @override
-  final int typeId = 7;
+  final int typeId = 4;
 
   @override
-  ArticleCacheModel read(BinaryReader reader) {
+  LocalVote read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return ArticleCacheModel(
-      cacheId: fields[0] as String,
-      articleId: fields[1] as String,
-      sectionId: fields[2] as String,
-      cachedData: (fields[3] as Map).cast<String, dynamic>(),
+    return LocalVote(
+      voteId: fields[0] as String,
+      postId: fields[1] as String,
+      userId: fields[2] as String,
+      upvoteStatus: fields[3] as bool,
+      isSynced: fields[4] as bool,
     );
   }
 
   @override
-  void write(BinaryWriter writer, ArticleCacheModel obj) {
+  void write(BinaryWriter writer, LocalVote obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(5)
       ..writeByte(0)
-      ..write(obj.cacheId)
+      ..write(obj.voteId)
       ..writeByte(1)
-      ..write(obj.articleId)
+      ..write(obj.postId)
       ..writeByte(2)
-      ..write(obj.sectionId)
+      ..write(obj.userId)
       ..writeByte(3)
-      ..write(obj.cachedData);
+      ..write(obj.upvoteStatus)
+      ..writeByte(4)
+      ..write(obj.isSynced);
   }
 
   @override
@@ -44,7 +47,7 @@ class ArticleCacheModelAdapter extends TypeAdapter<ArticleCacheModel> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ArticleCacheModelAdapter &&
+      other is LocalVoteAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

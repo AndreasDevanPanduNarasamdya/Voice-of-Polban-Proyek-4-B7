@@ -1,47 +1,44 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'notification_model.dart';
+part of 'sync_queue.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class NotificationModelAdapter extends TypeAdapter<NotificationModel> {
+class SyncQueueAdapter extends TypeAdapter<SyncQueue> {
   @override
-  final int typeId = 10;
+  final int typeId = 3;
 
   @override
-  NotificationModel read(BinaryReader reader) {
+  SyncQueue read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return NotificationModel(
-      notifId: fields[0] as String,
-      userId: fields[1] as String,
-      type: fields[2] as String,
-      relatedArticleId: fields[3] as String,
-      message: fields[4] as String,
-      isRead: fields[5] as bool,
+    return SyncQueue(
+      queueId: fields[0] as String,
+      actionType: fields[1] as String,
+      payload: fields[2] as String,
+      isProcessed: fields[3] as bool,
+      createdAt: fields[4] as DateTime,
     );
   }
 
   @override
-  void write(BinaryWriter writer, NotificationModel obj) {
+  void write(BinaryWriter writer, SyncQueue obj) {
     writer
-      ..writeByte(6)
-      ..writeByte(0)
-      ..write(obj.notifId)
-      ..writeByte(1)
-      ..write(obj.userId)
-      ..writeByte(2)
-      ..write(obj.type)
-      ..writeByte(3)
-      ..write(obj.relatedArticleId)
-      ..writeByte(4)
-      ..write(obj.message)
       ..writeByte(5)
-      ..write(obj.isRead);
+      ..writeByte(0)
+      ..write(obj.queueId)
+      ..writeByte(1)
+      ..write(obj.actionType)
+      ..writeByte(2)
+      ..write(obj.payload)
+      ..writeByte(3)
+      ..write(obj.isProcessed)
+      ..writeByte(4)
+      ..write(obj.createdAt);
   }
 
   @override
@@ -50,7 +47,7 @@ class NotificationModelAdapter extends TypeAdapter<NotificationModel> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is NotificationModelAdapter &&
+      other is SyncQueueAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

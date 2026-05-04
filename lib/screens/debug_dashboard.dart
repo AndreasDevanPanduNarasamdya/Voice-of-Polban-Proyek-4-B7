@@ -1,216 +1,241 @@
-// import 'package:flutter/material.dart';
-// import 'package:hive/hive.dart';
 
-// import '../controllers/article_controller.dart';
-// import '../controllers/auth_controller.dart';
-// import '../models/article_model.dart';
 
-// class DebugDashboard extends StatefulWidget {
-//   const DebugDashboard({super.key});
 
-//   @override
-//   State<DebugDashboard> createState() => _DebugDashboardState();
-// }
 
-// class _DebugDashboardState extends State<DebugDashboard> {
-//   final AuthController authController = AuthController();
-//   final ArticleController articleController = ArticleController();
 
-//   @override
-//   void initState() {
-//     super.initState();
-//     _seedUsers();
-//   }
 
-//   Future<void> _seedUsers() async {
-//     await authController.seedDummyUsers();
-//     await articleController.seedDummySection();
-//     if (mounted) {
-//       setState(() {});
-//     }
-//   }
 
-//   void _loginAsWriter() {
-//     authController.login('writer@polban.ac.id', 'password123');
-//     setState(() {});
-//   }
 
-//   void _loginAsEditor() {
-//     authController.login('editor@polban.ac.id', 'password123');
-//     setState(() {});
-//   }
 
-//   void _loginAsReader() {
-//     authController.login('reader@polban.ac.id', 'password123');
-//     setState(() {});
-//   }
 
-//   void _writeDraft() {
-//     final currentUser = authController.currentUser;
-//     if (currentUser == null) {
-//       _showMessage('Login first before writing a draft.');
-//       return;
-//     }
 
-//     articleController.saveDraft(
-//       'Demo Draft Title',
-//       'This is a dummy draft created from the debug dashboard.',
-//       currentUser.userId,
-//     );
 
-//     _showMessage('Draft saved for ${currentUser.name}.');
-//   }
 
-//   void _getOfflineArticles() {
-//     final articles = articleController.getLatestArticlesByCategory('sec-1');
-//     final titles = articles.map((article) => article.title).toList();
 
-//     // ignore: avoid_print
-//     print('Akademik articles count: ${articles.length}');
-//     // ignore: avoid_print
-//     print('Akademik article titles: $titles');
 
-//     _showMessage('Akademik articles: ${articles.length}');
-//   }
 
-//   ArticleModel? _getFirstArticle() {
-//     final box = Hive.box<ArticleModel>('article_box');
-//     if (box.isEmpty) {
-//       return null;
-//     }
 
-//     return box.values.first;
-//   }
 
-//   void _submitDraft() {
-//     final article = _getFirstArticle();
-//     if (article == null) {
-//       _showMessage('No article available to submit.');
-//       return;
-//     }
 
-//     articleController.submitDraft(article.articleId);
-//     setState(() {});
-//     _showMessage('Submitted article: ${article.title}');
-//   }
 
-//   void _approveArticle() {
-//     final article = _getFirstArticle();
-//     if (article == null) {
-//       _showMessage('No article available to approve.');
-//       return;
-//     }
 
-//     articleController.approveArticle(article.articleId);
-//     setState(() {});
-//     _showMessage('Approved article: ${article.title}');
-//   }
 
-//   void _publishArticle() {
-//     final article = _getFirstArticle();
-//     if (article == null) {
-//       _showMessage('No article available to publish.');
-//       return;
-//     }
 
-//     articleController.publishArticle(article.articleId);
-//     setState(() {});
-//     _showMessage('Published article: ${article.title}');
-//   }
 
-//   void _archiveArticle() {
-//     final article = _getFirstArticle();
-//     if (article == null) {
-//       _showMessage('No article available to archive.');
-//       return;
-//     }
 
-//     articleController.archiveArticle(article.articleId);
-//     setState(() {});
-//     _showMessage('Archived article: ${article.title}');
-//   }
 
-//   void _logout() {
-//     authController.logout();
-//     setState(() {});
-//     _showMessage('Logged out.');
-//   }
 
-//   void _showMessage(String message) {
-//     ScaffoldMessenger.of(
-//       context,
-//     ).showSnackBar(SnackBar(content: Text(message)));
-//   }
 
-//   String _currentUserLabel() {
-//     final currentUser = authController.currentUser;
-//     if (currentUser == null) {
-//       return 'Current user: None';
-//     }
 
-//     return 'Current user: ${currentUser.name} (${currentUser.role})';
-//   }
 
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(title: const Text('VOP Prototype')),
-//       body: ListView(
-//         padding: const EdgeInsets.all(16),
-//         children: [
-//           Text(
-//             _currentUserLabel(),
-//             style: Theme.of(context).textTheme.titleMedium,
-//           ),
-//           const SizedBox(height: 16),
-//           ElevatedButton(
-//             onPressed: _loginAsWriter,
-//             child: const Text('Login as Writer'),
-//           ),
-//           const SizedBox(height: 8),
-//           ElevatedButton(
-//             onPressed: _loginAsEditor,
-//             child: const Text('Login as Editor'),
-//           ),
-//           const SizedBox(height: 8),
-//           ElevatedButton(
-//             onPressed: _loginAsReader,
-//             child: const Text('Login as Reader'),
-//           ),
-//           const SizedBox(height: 8),
-//           ElevatedButton(
-//             onPressed: _writeDraft,
-//             child: const Text('Write Draft'),
-//           ),
-//           const SizedBox(height: 8),
-//           ElevatedButton(
-//             onPressed: _submitDraft,
-//             child: const Text('Submit Draft'),
-//           ),
-//           const SizedBox(height: 8),
-//           ElevatedButton(
-//             onPressed: _approveArticle,
-//             child: const Text('Approve Article'),
-//           ),
-//           const SizedBox(height: 8),
-//           ElevatedButton(
-//             onPressed: _publishArticle,
-//             child: const Text('Publish Article'),
-//           ),
-//           const SizedBox(height: 8),
-//           ElevatedButton(
-//             onPressed: _archiveArticle,
-//             child: const Text('Archive Article'),
-//           ),
-//           const SizedBox(height: 8),
-//           ElevatedButton(onPressed: _logout, child: const Text('Logout')),
-//           const SizedBox(height: 8),
-//           ElevatedButton(
-//             onPressed: _getOfflineArticles,
-//             child: const Text('Get Offline Articles (Akademik)'),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
+import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
+import '../auth/auth_controller.dart';
+import '../controller/post_controller.dart';
+import '../models/cached_post.dart';
+import '../models/local_draft.dart';
+import '../models/sync_queue.dart';
+
+class DebugDashboard extends StatefulWidget {
+	const DebugDashboard({super.key});
+
+	@override
+	State<DebugDashboard> createState() => _DebugDashboardState();
+}
+
+class _DebugDashboardState extends State<DebugDashboard> {
+	final AuthController _authController = AuthController();
+	final PostController _postController = PostController();
+
+	LocalDraft? _lastDraft;
+
+	@override
+	void initState() {
+		super.initState();
+		_bootstrap();
+	}
+
+	Future<void> _bootstrap() async {
+		await _authController.seedDummyUsers();
+		await _seedCachedPosts();
+		if (mounted) {
+			setState(() {});
+		}
+	}
+
+	Future<void> _seedCachedPosts() async {
+		final box = Hive.box<CachedPost>('cached_post_box');
+		if (box.isNotEmpty) {
+			return;
+		}
+
+		await box.put(
+			'cached-post-1',
+			CachedPost(
+				postId: 'cached-post-1',
+				cachedData: '{"title":"Offline post 1","body":"Cached for debug"}',
+				cachedAt: DateTime.now(),
+			),
+		);
+		await box.put(
+			'cached-post-2',
+			CachedPost(
+				postId: 'cached-post-2',
+				cachedData: '{"title":"Offline post 2","body":"Cached for debug"}',
+				cachedAt: DateTime.now(),
+			),
+		);
+	}
+
+	void _showMessage(String message) {
+		ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+	}
+
+	void _log(String message) {
+		debugPrint(message);
+		_showMessage(message);
+	}
+
+	void _loginWriter() {
+		final user = _authController.login('writer@polban.ac.id', 'password123');
+		if (user == null) {
+			_log('Writer login failed.');
+			return;
+		}
+
+		setState(() {});
+		_log('Logged in: ${user.name} (${user.role.name})');
+	}
+
+	void _writeLocalDraft() {
+		final currentUser = _authController.currentUser;
+		if (currentUser == null) {
+			_log('Login writer first.');
+			return;
+		}
+
+		final draft = _postController.saveDraft(
+			'Local draft from dashboard',
+			'This draft was created while offline.',
+			currentUser.userId,
+		);
+
+		setState(() {
+			_lastDraft = draft;
+		});
+
+		_log('Draft saved: ${draft.localId}');
+	}
+
+	void _submitDraftToQueue() {
+		final draft = _lastDraft ??
+				(Hive.box<LocalDraft>('local_draft_box').values.isNotEmpty
+						? Hive.box<LocalDraft>('local_draft_box').values.last
+						: null);
+
+		if (draft == null) {
+			_log('No draft available to submit.');
+			return;
+		}
+
+		final queueEntry = _postController.submitDraft(draft.localId);
+		if (queueEntry == null) {
+			_log('Draft not found in local box.');
+			return;
+		}
+
+		setState(() {
+			_lastDraft = _postController.getDraftById(draft.localId);
+		});
+
+		_log('Queued draft. Pending queue length: ${_postController.pendingQueueLength}');
+	}
+
+	void _getCachedPosts() {
+		final posts = _postController.getOfflinePosts();
+		final message = 'Cached posts: ${posts.length}';
+		debugPrint(message);
+		for (final post in posts) {
+			debugPrint(' - ${post.postId}: ${post.cachedData}');
+		}
+		_showMessage(message);
+	}
+
+	void _logout() {
+		final user = _authController.logout();
+		setState(() {});
+		_log(user == null ? 'Logged out.' : 'Logged out: ${user.name}');
+	}
+
+	String _currentUserLabel() {
+		final currentUser = _authController.currentUser;
+		if (currentUser == null) {
+			return 'Current user: None';
+		}
+
+		return 'Current user: ${currentUser.name} (${currentUser.role.name})';
+	}
+
+	@override
+	Widget build(BuildContext context) {
+		return Scaffold(
+			backgroundColor: const Color(0xFF0F0F10),
+			appBar: AppBar(
+				backgroundColor: const Color(0xFF15161A),
+				title: const Text('Voice of Polban Debug Dashboard'),
+			),
+			body: ListView(
+				padding: const EdgeInsets.all(16),
+				children: [
+					Text(
+						_currentUserLabel(),
+						style: Theme.of(context).textTheme.titleMedium?.copyWith(
+									color: Colors.white,
+								),
+					),
+					const SizedBox(height: 8),
+					Text(
+						'Draft in queue: ${_postController.pendingQueueLength}',
+						style: const TextStyle(color: Colors.white70),
+					),
+					const SizedBox(height: 16),
+					ElevatedButton(
+						onPressed: _loginWriter,
+						child: const Text('Login Writer'),
+					),
+					const SizedBox(height: 8),
+					ElevatedButton(
+						onPressed: _writeLocalDraft,
+						child: const Text('Write Local Draft'),
+					),
+					const SizedBox(height: 8),
+					ElevatedButton(
+						onPressed: _submitDraftToQueue,
+						child: const Text('Submit Draft to Queue'),
+					),
+					const SizedBox(height: 8),
+					ElevatedButton(
+						onPressed: _getCachedPosts,
+						child: const Text('Get Cached Posts'),
+					),
+					const SizedBox(height: 8),
+					OutlinedButton(
+						onPressed: _logout,
+						child: const Text('Logout'),
+					),
+					const SizedBox(height: 16),
+					ValueListenableBuilder<Box<SyncQueue>>(
+						valueListenable: Hive.box<SyncQueue>('sync_queue_box').listenable(),
+						builder: (context, queueBox, _) {
+							return Text(
+								'Queue entries: ${queueBox.length}',
+								style: const TextStyle(color: Colors.white70),
+							);
+						},
+					),
+				],
+			),
+		);
+	}
+}
