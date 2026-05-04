@@ -69,8 +69,11 @@ class _DebugDashboardState extends State<DebugDashboard> {
     _showMessage(message);
   }
 
-  void _loginWriter() {
-    final user = _authController.login('writer@polban.ac.id', 'password123');
+  Future<void> _loginWriter() async {
+    final user = await _authController.login(
+      'writer@polban.ac.id',
+      'password123',
+    );
     if (user == null) {
       _log('Writer login failed.');
       return;
@@ -80,14 +83,14 @@ class _DebugDashboardState extends State<DebugDashboard> {
     _log('Logged in: ${user.name} (${user.role.name})');
   }
 
-  void _writeLocalDraft() {
+  Future<void> _writeLocalDraft() async {
     final currentUser = _authController.currentUser;
     if (currentUser == null) {
       _log('Login writer first.');
       return;
     }
 
-    final draft = _postController.saveDraft(
+    final draft = await _postController.saveDraft(
       'Local draft from dashboard',
       'This draft was created while offline.',
       currentUser.userId,
@@ -100,7 +103,7 @@ class _DebugDashboardState extends State<DebugDashboard> {
     _log('Draft saved: ${draft.localId}');
   }
 
-  void _submitDraftToQueue() {
+  Future<void> _submitDraftToQueue() async {
     final draft =
         _lastDraft ??
         (Hive.box<LocalDraft>('local_draft_box').values.isNotEmpty
@@ -112,7 +115,7 @@ class _DebugDashboardState extends State<DebugDashboard> {
       return;
     }
 
-    final queueEntry = _postController.submitDraft(draft.localId);
+    final queueEntry = await _postController.submitDraft(draft.localId);
     if (queueEntry == null) {
       _log('Draft not found in local box.');
       return;

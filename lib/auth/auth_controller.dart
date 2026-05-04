@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/app_enums.dart';
 import '../models/cached_user.dart';
@@ -42,7 +44,7 @@ class AuthController {
     }
   }
 
-  CachedUser? login(String input, String password) {
+  Future<CachedUser?> login(String input, String password) async {
     final normalizedInput = input.trim().toLowerCase();
     final normalizedPassword = password.trim();
 
@@ -72,8 +74,53 @@ class AuthController {
       return null;
     }
 
-    _currentUser = matchedUser;
-    return matchedUser;
+    try {
+      final supabase = Supabase.instance.client;
+
+      final response = await supabase
+          .from('users')
+          .select('user_id, name, email, role')
+          .eq('email', matchedUser.email)
+          .maybeSingle();
+
+      String supabaseUserId;
+
+      if (response != null) {
+        supabaseUserId = response['user_id'] as String;
+        debugPrint('User found in Supabase: $supabaseUserId');
+      } else {
+        final insertResponse = await supabase
+            .from('users')
+            .insert({
+              'name': matchedUser.name,
+              'email': matchedUser.email,
+              'password_hash': '123456',
+              'role': matchedUser.role.name,
+            })
+            .select('user_id')
+            .single();
+
+        supabaseUserId = insertResponse['user_id'] as String;
+        debugPrint('User created in Supabase: $supabaseUserId');
+      }
+
+      final cachedUser = CachedUser(
+        userId: supabaseUserId,
+        name: matchedUser.name,
+        email: matchedUser.email,
+        role: matchedUser.role,
+        avatarUrl: matchedUser.avatarUrl,
+      );
+
+      await _usersBox.put(supabaseUserId, cachedUser);
+      _currentUser = cachedUser;
+
+      return cachedUser;
+    } catch (e) {
+      debugPrint('Supabase sync failed: $e. Falling back to local-only login.');
+      _currentUser = matchedUser;
+      return matchedUser;
+    }
   }
 
   CachedUser? logout() {
