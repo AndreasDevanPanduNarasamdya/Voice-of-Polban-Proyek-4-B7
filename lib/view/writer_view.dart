@@ -269,9 +269,8 @@ class _WriterPageState extends State<WriterPage> {
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-          ],
+            ],
+          ),
         ),
       ),
     );

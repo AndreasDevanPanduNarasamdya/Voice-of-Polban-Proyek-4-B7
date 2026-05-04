@@ -12,7 +12,6 @@ class ArticlePage extends StatefulWidget {
 
   @override
   State<ArticlePage> createState() => _ArticlePageState();
-  State<ArticlePage> createState() => _ArticlePageState();
 }
 
 class _ArticlePageState extends State<ArticlePage> {
@@ -316,63 +315,4 @@ class _ArticlePageState extends State<ArticlePage> {
       ),
     );
   }
-
-  Widget _imgPlaceholder() => Container(
-        height: 220,
-        width: double.infinity,
-        color: _accentColor,
-        child: const Center(
-          child: Icon(Icons.image_outlined, color: Colors.white24, size: 56),
-        ),
-      );
-
-  Widget _iconBtn(IconData icon, VoidCallback onTap) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          child: Icon(icon, color: Colors.white54, size: 20),
-        ),
-      );
-
-  Widget _buildCommentTile(Map<String, String> comment) => Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: _cardColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: _accentColor.withOpacity(0.4)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const CircleAvatar(
-              radius: 16,
-              backgroundColor: _accentColor,
-              child: Icon(Icons.person, color: Colors.white70, size: 18),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(comment['name'] ?? '',
-                          style: const TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
-                      const Spacer(),
-                      Text(comment['time'] ?? '',
-                          style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(comment['text'] ?? '',
-                      style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
 }
