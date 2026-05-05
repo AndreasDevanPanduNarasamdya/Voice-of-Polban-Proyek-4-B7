@@ -40,11 +40,29 @@ Future<void> setupHive() async {
     Hive.registerAdapter(CachedUserAdapter());
   }
 
-  await Hive.openBox<LocalDraft>('local_draft_box');
-  await Hive.openBox<CachedPost>('cached_post_box');
-  await Hive.openBox<SyncQueue>('sync_queue_box');
-  await Hive.openBox<LocalVote>('local_vote_box');
-  await Hive.openBox<LocalComment>('local_comment_box');
-  await Hive.openBox<LocalBookmark>('local_bookmark_box');
-  await Hive.openBox<CachedUser>('cached_user_box');
+  if (!Hive.isBoxOpen('local_draft_box')) {
+    await Hive.openBox<LocalDraft>('local_draft_box');
+  }
+  if (!Hive.isBoxOpen('cached_post_box')) {
+    await Hive.openBox<CachedPost>('cached_post_box');
+  }
+  if (!Hive.isBoxOpen('sync_queue_box')) {
+    await Hive.openBox<SyncQueue>('sync_queue_box');
+  }
+  if (!Hive.isBoxOpen('local_vote_box')) {
+    await Hive.openBox<LocalVote>('local_vote_box');
+  }
+  if (!Hive.isBoxOpen('local_comment_box')) {
+    await Hive.openBox<LocalComment>('local_comment_box');
+  }
+  if (!Hive.isBoxOpen('local_bookmark_box')) {
+    await Hive.openBox<LocalBookmark>('local_bookmark_box');
+  }
+  if (!Hive.isBoxOpen('cached_user_box')) {
+    await Hive.openBox<CachedUser>('cached_user_box');
+  }
+  // Session box used by UI to listen for login/logout changes
+  if (!Hive.isBoxOpen('session_box')) {
+    await Hive.openBox('session_box');
+  }
 }

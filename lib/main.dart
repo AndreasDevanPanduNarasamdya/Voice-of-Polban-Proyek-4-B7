@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'screens/debug_dashboard.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+// screens/debug_dashboard.dart removed from imports (unused)
+import 'package:voice_of_polban/auth/auth_view.dart';
 import 'models/hive_setup.dart';
 
 Future<void> main() async {
@@ -13,7 +15,12 @@ Future<void> main() async {
     anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
 
+  // Ensure Hive is initialized and all required boxes are opened before runApp
+  await Hive.initFlutter();
+
+  // Register adapters and open the canonical boxes (also safe if called twice)
   await setupHive();
+
   runApp(const VoiceOfPolbanApp());
 }
 
@@ -40,7 +47,7 @@ class VoiceOfPolbanApp extends StatelessWidget {
         ),
       ),
 
-      home: const DebugDashboard(),
+      home: const LoginView(),
     );
   }
 }
