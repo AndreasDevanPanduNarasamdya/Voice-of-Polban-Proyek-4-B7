@@ -2,107 +2,136 @@ import 'package:flutter/material.dart';
 import 'package:voice_of_polban/view/writer_view.dart';
 import 'package:voice_of_polban/auth/auth_view.dart';
 import 'package:voice_of_polban/view/editor_view.dart';
+import 'package:voice_of_polban/view/draft_view.dart';
+import 'package:voice_of_polban/view/settings_view.dart';
 import '../models/app_enums.dart';
 
 class AppSidebar extends StatelessWidget {
   final UserRole currentUserRole;
   const AppSidebar({super.key, required this.currentUserRole});
 
+  static const Color _bg  = Color(0xFF1A1A1A);
+  static const Color _card = Color(0xFF232323);
+  static const Color _red = Color(0xFFE53935);
+
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      backgroundColor: const Color(0xFF121212), // Match Dark Theme
-      child: ListView(
-        padding: EdgeInsets.zero,
+      backgroundColor: _bg,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(color: Colors.black),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
+          // ── Header profil ──
+          Container(
+            color: _card,
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 16,
+              left: 16,
+              right: 16,
+              bottom: 20,
+            ),
+            child: const Row(
               children: [
                 CircleAvatar(
-                  radius: 24,
+                  radius: 28,
                   backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
                 ),
-                SizedBox(height: 10),
-                Text(
-                  'Voice of Polban',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+                SizedBox(width: 14),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Selamat Datang,',
+                        style: TextStyle(color: Colors.white60, fontSize: 13)),
+                    Text('James McGill',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold)),
+                  ],
                 ),
               ],
             ),
           ),
-          _buildTile(context, Icons.book, 'Catatan Logbook'),
-          _buildTile(context, Icons.save, 'Data Persistence'),
 
-          // WRITER → Tulis Artikel
+          const SizedBox(height: 8),
+
+          // ── Tersimpan ──
+          _tile(context, Icons.bookmark_border, 'Tersimpan',
+              onTap: () => Navigator.pop(context)),
+
+          // ── Tulis Post (writer) / Lihat Draft (editor) ──
           if (currentUserRole == UserRole.writer)
-            ListTile(
-              leading: const Icon(Icons.edit_document, color: Colors.white),
-              title: const Text(
-                'Tulis Artikel',
-                style: TextStyle(color: Colors.white),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const WriterPage()),
-                );
-              },
-            ),
-
-          // EDITOR → Lihat Draft
-          if (currentUserRole == UserRole.editor)
-            ListTile(
-              leading: const Icon(Icons.edit_document, color: Colors.white),
-              title: const Text(
-                'Lihat Draft',
-                style: TextStyle(color: Colors.white),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const EditorPage()),
-                );
-              },
-            ),
-
-          const Divider(color: Color(0xFF333333)),
-          _buildTile(context, Icons.settings, 'Pengaturan'),
-
-          // Sign Out Logic
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text(
-              'Keluar',
-              style: TextStyle(color: Colors.redAccent),
-            ),
-            onTap: () {
+            _tile(context, Icons.edit_outlined, 'Tulis Post', onTap: () {
               Navigator.pop(context);
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginView()),
-                (route) => false,
-              );
-            },
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const WriterPage()));
+            }),
+
+          if (currentUserRole == UserRole.editor)
+            _tile(context, Icons.edit_outlined, 'Tulis Post', onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const WriterPage()));
+            }),
+
+          // ── Lihat Draft ──
+          _tile(context, Icons.inbox_outlined, 'Lihat Draft', onTap: () {
+            Navigator.pop(context);
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const DraftPage()));
+          }),
+
+          // ── Pengaturan ──
+          _tile(context, Icons.settings_outlined, 'Pengaturan', onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SettingsPage(
+                  userName: 'James McGill',
+                  role: currentUserRole == UserRole.writer
+                      ? UserRole.writer
+                      : UserRole.editor,
+                ),
+              ),
+            );
+          }),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Divider(color: Color(0xFF333333), height: 1),
           ),
+
+          // ── Keluar ──
+          _tile(context, Icons.logout, 'Keluar', color: _red, onTap: () {
+            Navigator.pop(context);
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginView()),
+              (route) => false,
+            );
+          }),
+
+          const Spacer(),
         ],
       ),
     );
   }
 
-  Widget _buildTile(BuildContext context, IconData icon, String title) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.white),
-      title: Text(title, style: const TextStyle(color: Colors.white)),
-      onTap: () => Navigator.pop(context),
+  Widget _tile(BuildContext context, IconData icon, String label,
+      {required VoidCallback onTap, Color color = Colors.white}) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(width: 16),
+            Text(label, style: TextStyle(color: color, fontSize: 15)),
+          ],
+        ),
+      ),
     );
   }
 }
