@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart'; // Used for formatting real dates
-import '../models/article_model.dart';
-import '../models/user_model.dart';
+import '../models/cached_post.dart';
+import '../models/cached_user.dart';
 import '../models/app_enums.dart';
-import '../controller/article_controller.dart';
-import '../auth/auth_service.dart';
+import '../controller/post_controller.dart';
+import '../auth/auth_controller.dart';
 import 'package:voice_of_polban/view/sidebar.dart';
 import 'article_view.dart';
 
@@ -17,18 +18,19 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final AuthService _authService = AuthService();
-  late final ArticleController _controller;
+  final AuthController _authController = AuthController();
+  final PostController _controller = PostController();
   int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _controller = ArticleController(authService: _authService);
+    // Fetch latest feed on startup (updates local cache)
+    _controller.fetchFeed();
   }
 
   String _getAuthorName(String authorId) {
-    final user = Hive.box<UserModel>('user_box').get(authorId);
+    final user = Hive.box<CachedUser>('cached_user_box').get(authorId);
     return user?.name ?? "Penulis Tidak Diketahui";
   }
 
@@ -38,7 +40,8 @@ class _HomePageState extends State<HomePage> {
     return ValueListenableBuilder<Box>(
       valueListenable: Hive.box('session_box').listenable(),
       builder: (context, sessionBox, _) {
-        final currentUserRole = _authService.getCurrentUserRole();
+        final currentUserRole =
+            _authController.currentUser?.role ?? UserRole.reader;
 
         return Scaffold(
           backgroundColor: Colors.black, // Dark Theme
@@ -59,13 +62,14 @@ class _HomePageState extends State<HomePage> {
           ),
 
           // 2. REACTIVE FEED: Listens to new articles/publications instantly
-          body: ValueListenableBuilder<Box<ArticleModel>>(
-            valueListenable: Hive.box<ArticleModel>('article_box').listenable(),
-            builder: (context, articlesBox, _) {
-              // The controller fetches the FRESH data every time the box changes
-              final feedData = _controller.getLatestArticles();
+          body: ValueListenableBuilder<Box<CachedPost>>(
+            valueListenable: Hive.box<CachedPost>(
+              'cached_post_box',
+            ).listenable(),
+            builder: (context, postsBox, _) {
+              final posts = _controller.getOfflinePosts();
 
-              if (feedData.isEmpty) {
+              if (posts.isEmpty) {
                 return const Center(
                   child: Text(
                     "Belum ada artikel yang dipublikasikan.",
@@ -75,9 +79,10 @@ class _HomePageState extends State<HomePage> {
               }
 
               return ListView.builder(
-                itemCount: feedData.length,
+                itemCount: posts.length,
                 itemBuilder: (context, index) {
-                  return _buildArticleCard(context, feedData[index]);
+                  final post = posts[index];
+                  return _buildArticleCard(context, post);
                 },
               );
             },
@@ -119,19 +124,20 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildArticleCard(BuildContext context, ArticleModel article) {
-    final dateString = DateFormat(
-      'EEEE, dd MMMM yyyy',
-    ).format(article.createdAt);
+  Widget _buildArticleCard(BuildContext context, CachedPost post) {
+    final parsed = jsonDecode(post.cachedData) as Map<String, dynamic>;
+    final title = parsed['title'] ?? '';
+    final authorId = parsed['author_id']?.toString() ?? '';
+    final dateString = DateFormat('EEEE, dd MMMM yyyy').format(post.cachedAt);
 
-    final authorName = _getAuthorName(article.authorId);
+    final authorName = _getAuthorName(authorId);
 
     return InkWell(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ArticlePage(articleId: article.articleId),
+            builder: (context) => ArticlePage(articleId: post.postId),
           ),
         );
       },
@@ -171,7 +177,7 @@ class _HomePageState extends State<HomePage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12.0),
               child: Text(
-                article.title,
+                title,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,

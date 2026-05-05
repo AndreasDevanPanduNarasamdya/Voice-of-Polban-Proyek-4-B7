@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../models/article_model.dart';
-import '../models/user_model.dart';
-import '../controller/article_controller.dart';
-import '../auth/auth_service.dart'; // Needed for Dependency Injection
+import '../models/cached_post.dart';
+import '../models/cached_user.dart';
 
 class ArticlePage extends StatefulWidget {
   final String articleId;
@@ -15,28 +14,23 @@ class ArticlePage extends StatefulWidget {
 }
 
 class _ArticlePageState extends State<ArticlePage> {
-  // 1. Dependency Injection setup
-  final AuthService _authService = AuthService();
-  late final ArticleController _controller;
-  late final ArticleModel? _article;
+  CachedPost? _post;
 
   @override
   void initState() {
     super.initState();
-    // Initialize controller with the required auth service
-    _controller = ArticleController(authService: _authService);
-    _article = _controller.getArticle(widget.articleId);
+    _post = Hive.box<CachedPost>('cached_post_box').get(widget.articleId);
   }
 
   // 2. Helper to fetch the real name matching the ERD relation
   String _getAuthorName(String authorId) {
-    final user = Hive.box<UserModel>('user_box').get(authorId);
+    final user = Hive.box<CachedUser>('cached_user_box').get(authorId);
     return user?.name ?? "Penulis Tidak Diketahui";
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_article == null) {
+    if (_post == null) {
       return Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
@@ -56,10 +50,13 @@ class _ArticlePageState extends State<ArticlePage> {
     }
 
     // 3. Format the real database timestamp
-    final dateString = DateFormat(
-      'EEEE, dd MMMM yyyy',
-    ).format(_article!.createdAt);
-    final authorName = _getAuthorName(_article!.authorId);
+    final p = _post!;
+    final parsed = jsonDecode(p.cachedData) as Map<String, dynamic>;
+    final title = parsed['title'] ?? '';
+    final content = parsed['content'] ?? '';
+    final authorId = parsed['author_id']?.toString() ?? '';
+    final dateString = DateFormat('EEEE, dd MMMM yyyy').format(p.cachedAt);
+    final authorName = _getAuthorName(authorId);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -88,7 +85,7 @@ class _ArticlePageState extends State<ArticlePage> {
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text(
-                _article!.title,
+                title,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
@@ -155,7 +152,7 @@ class _ArticlePageState extends State<ArticlePage> {
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text(
-                _article!.content, // REAL content
+                content, // REAL content
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 14,

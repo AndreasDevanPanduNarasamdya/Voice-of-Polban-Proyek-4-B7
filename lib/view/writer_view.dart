@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import '../controller/article_controller.dart';
-import '../auth/auth_service.dart';
+
+import '../auth/auth_controller.dart';
+import '../controller/post_controller.dart';
+import '../models/local_draft.dart';
 
 class WriterPage extends StatefulWidget {
   const WriterPage({super.key});
@@ -10,16 +12,16 @@ class WriterPage extends StatefulWidget {
 }
 
 class _WriterPageState extends State<WriterPage> {
-  // 1. Core Architecture Integrations
-  final AuthService _authService = AuthService();
-  late final ArticleController _articleController;
+  final AuthController _authController = AuthController();
+  final PostController _postController = PostController();
 
-  // 2. Form State Controllers
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
-  String? _selectedSectionId;
 
-  // 3. Mock Sections (Usually fetched from a SectionBox in Hive)
+  bool _isSaving = false;
+  bool _isSubmitting = false;
+  LocalDraft? _draft;
+
   final List<Map<String, String>> _sections = [
     {'id': 'sec_akademik', 'name': 'Akademik'},
     {'id': 'sec_kampus', 'name': 'Kampus'},
@@ -27,12 +29,7 @@ class _WriterPageState extends State<WriterPage> {
     {'id': 'sec_organisasi', 'name': 'Organisasi'},
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    // Inject the Auth Service into the Article Controller
-    _articleController = ArticleController(authService: _authService);
-  }
+  String? _selectedSectionId;
 
   @override
   void dispose() {
@@ -41,40 +38,107 @@ class _WriterPageState extends State<WriterPage> {
     super.dispose();
   }
 
-  void _submitDraft() {
+  String? get _currentUserId => _authController.currentUser?.userId;
+
+  Future<void> _saveDraft() async {
     final title = _titleController.text.trim();
     final content = _contentController.text.trim();
+    final userId = _currentUserId;
 
-    // Validation
-    if (title.isEmpty || content.isEmpty || _selectedSectionId == null) {
+    if (title.isEmpty || content.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Judul, Isi, dan Kategori wajib diisi!"),
+          content: Text('Judul dan isi artikel wajib diisi!'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    // Call the Domain Controller
-    _articleController.createDraft(
-      title: title,
-      content: content,
-      sectionId: _selectedSectionId!,
-    );
+    if (userId == null || userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pengguna belum login.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
-    // Give UX feedback and return to feed
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Draf berhasil disimpan!"),
-        backgroundColor: Colors.green,
-      ),
-    );
-    Navigator.pop(context);
+    setState(() => _isSaving = true);
+    try {
+      final savedDraft = await _postController.saveDraft(
+        title,
+        content,
+        userId,
+      );
+      if (!mounted) return;
+      setState(() => _draft = savedDraft);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Draf tersimpan dengan ID ${savedDraft.postId}.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal menyimpan draf: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  Future<void> _submitDraft() async {
+    if (_draft == null) {
+      await _saveDraft();
+      if (_draft == null) {
+        return;
+      }
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final queueEntry = await _postController.submitDraft(_draft!.localId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            queueEntry == null
+                ? 'Draft tidak ditemukan.'
+                : 'Draf dikirim untuk review: ${queueEntry.queueId}.',
+          ),
+          backgroundColor: queueEntry == null ? Colors.red : Colors.green,
+        ),
+      );
+      if (queueEntry != null) {
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal mengirim draf: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final draftStatus = _draft?.status.name.toUpperCase();
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -85,7 +149,7 @@ class _WriterPageState extends State<WriterPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          "VOP",
+          'VOP',
           style: TextStyle(
             color: Color(0xFF000080),
             fontSize: 24,
@@ -101,7 +165,21 @@ class _WriterPageState extends State<WriterPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // --- TITLE FIELD ---
+              if (draftStatus != null) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF2A2A2A)),
+                  ),
+                  child: Text(
+                    'Status draf: $draftStatus',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -112,18 +190,16 @@ class _WriterPageState extends State<WriterPage> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: TextField(
-                  controller: _titleController, // Bound to controller
+                  controller: _titleController,
                   style: const TextStyle(color: Colors.white),
                   decoration: const InputDecoration(
-                    hintText: "Masukkan Judul",
+                    hintText: 'Masukkan Judul',
                     hintStyle: TextStyle(color: Colors.grey),
                     border: InputBorder.none,
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-
-              // --- IMAGE UPLOAD (Placeholder) ---
               Container(
                 height: 180,
                 padding: const EdgeInsets.all(16),
@@ -136,7 +212,7 @@ class _WriterPageState extends State<WriterPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      "Tambah Gambar Depan",
+                      'Tambah Gambar Depan',
                       style: TextStyle(color: Colors.grey, fontSize: 16),
                     ),
                     Container(
@@ -158,7 +234,7 @@ class _WriterPageState extends State<WriterPage> {
                           ),
                           SizedBox(width: 4),
                           Text(
-                            "Tambah Gambar",
+                            'Tambah Gambar',
                             style: TextStyle(
                               color: Colors.black,
                               fontSize: 10,
@@ -172,8 +248,6 @@ class _WriterPageState extends State<WriterPage> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // --- CONTENT FIELD (Fixed UI/UX) ---
               Container(
                 height: 250,
                 padding: const EdgeInsets.symmetric(
@@ -185,20 +259,17 @@ class _WriterPageState extends State<WriterPage> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: TextField(
-                  controller: _contentController, // Bound to controller
-                  maxLines: null, // Allows multiline wrapping
+                  controller: _contentController,
+                  maxLines: null,
                   style: const TextStyle(color: Colors.white),
                   decoration: const InputDecoration(
-                    hintText:
-                        "Tulis isi artikel di sini...", // Fixed overlapping UX
+                    hintText: 'Tulis isi artikel di sini...',
                     hintStyle: TextStyle(color: Colors.grey),
                     border: InputBorder.none,
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-
-              // --- CATEGORY DROPDOWN (Now Dynamic!) ---
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -218,7 +289,7 @@ class _WriterPageState extends State<WriterPage> {
                     isExpanded: true,
                     value: _selectedSectionId,
                     hint: const Text(
-                      "Pilih Kategori",
+                      'Pilih Kategori',
                       style: TextStyle(color: Colors.white),
                     ),
                     items: _sections.map((section) {
@@ -239,35 +310,61 @@ class _WriterPageState extends State<WriterPage> {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // --- SUBMIT BUTTON ---
-              Align(
-                alignment: Alignment.centerRight,
-                child: ElevatedButton.icon(
-                  onPressed: _submitDraft, // Trigger the submission
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E1E1E),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _isSaving ? null : _saveDraft,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1E1E1E),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                    label: Text(
+                      _isSaving ? 'Menyimpan...' : 'Simpan Draf',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.save_outlined,
+                      color: Color(0xFFFF8C00),
+                      size: 18,
                     ),
                   ),
-                  label: const Text(
-                    "Submit ke draf",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: _isSubmitting ? null : _submitDraft,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF000080),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                    label: Text(
+                      _isSubmitting ? 'Mengirim...' : 'Kirim Review',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.send_outlined,
+                      color: Color(0xFFFF8C00),
+                      size: 18,
                     ),
                   ),
-                  icon: const Icon(
-                    Icons.send_outlined,
-                    color: Color(0xFFFF8C00),
-                    size: 18,
-                  ),
-                ),
+                ],
               ),
             ],
           ),

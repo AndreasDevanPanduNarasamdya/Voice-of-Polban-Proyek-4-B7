@@ -186,6 +186,145 @@ class PostController {
     return _cachedPostsBox.values.toList(growable: false);
   }
 
+  /// Fetch published posts from Supabase, update local cache, and return them.
+  Future<List<CachedPost>> fetchFeed() async {
+    final supabase = Supabase.instance.client;
+    try {
+      final rows = await supabase
+          .from('posts')
+          .select('post_id, title, content, author_id, status, created_at')
+          .eq('status', PostStatus.published.name)
+          .order('created_at', ascending: false);
+
+      final List<CachedPost> posts = [];
+      for (final row in rows as List) {
+        final map = Map<String, dynamic>.from(row as Map);
+        final postId = (map['post_id'] ?? map['id'] ?? '').toString();
+        final title = (map['title'] ?? '').toString();
+        final content = (map['content'] ?? '').toString();
+        final createdAtRaw = map['created_at'];
+        DateTime createdAt;
+        if (createdAtRaw is String) {
+          createdAt = DateTime.tryParse(createdAtRaw) ?? DateTime.now();
+        } else if (createdAtRaw is DateTime) {
+          createdAt = createdAtRaw;
+        } else {
+          createdAt = DateTime.now();
+        }
+
+        final cachedData = jsonEncode({
+          'title': title,
+          'content': content,
+          'author_id': map['author_id'],
+        });
+
+        if (postId.isEmpty) continue;
+
+        final cachedPost = CachedPost(
+          postId: postId,
+          cachedData: cachedData,
+          cachedAt: createdAt,
+        );
+        await _cachedPostsBox.put(postId, cachedPost);
+        posts.add(cachedPost);
+      }
+
+      return posts;
+    } catch (e) {
+      debugPrint('Failed to fetch feed from Supabase: $e');
+      return getOfflinePosts();
+    }
+  }
+
+  Future<List<CachedPost>> fetchPendingPosts() async {
+    final supabase = Supabase.instance.client;
+    try {
+      final rows = await supabase
+          .from('posts')
+          .select('post_id, title, content, author_id, status, created_at')
+          .eq('status', PostStatus.pending.name)
+          .order('created_at', ascending: false);
+
+      final List<CachedPost> posts = [];
+      for (final row in rows as List) {
+        final map = Map<String, dynamic>.from(row as Map);
+        final postId = (map['post_id'] ?? map['id'] ?? '').toString();
+        if (postId.isEmpty) continue;
+
+        final cachedPost = CachedPost(
+          postId: postId,
+          cachedData: jsonEncode({
+            'title': (map['title'] ?? '').toString(),
+            'content': (map['content'] ?? '').toString(),
+            'author_id': map['author_id'],
+            'status': PostStatus.pending.name,
+          }),
+          cachedAt:
+              DateTime.tryParse((map['created_at'] ?? '').toString()) ??
+              DateTime.now(),
+        );
+
+        await _cachedPostsBox.put(postId, cachedPost);
+        posts.add(cachedPost);
+      }
+
+      return posts;
+    } catch (e) {
+      debugPrint('Failed to fetch pending posts from Supabase: $e');
+      return <CachedPost>[];
+    }
+  }
+
+  Future<bool> approvePost(String postId) async {
+    try {
+      await Supabase.instance.client
+          .from('posts')
+          .update({'status': PostStatus.published.name})
+          .eq('post_id', postId);
+
+      final cachedPost = _cachedPostsBox.get(postId);
+      if (cachedPost != null) {
+        final data = Map<String, dynamic>.from(
+          jsonDecode(cachedPost.cachedData) as Map,
+        );
+        data['status'] = PostStatus.published.name;
+        cachedPost.cachedData = jsonEncode(data);
+        cachedPost.cachedAt = DateTime.now();
+        await _cachedPostsBox.put(postId, cachedPost);
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Failed to approve post $postId: $e');
+      return false;
+    }
+  }
+
+  Future<bool> rejectPost(String postId) async {
+    try {
+      await Supabase.instance.client
+          .from('posts')
+          .update({'status': PostStatus.rejected.name})
+          .eq('post_id', postId);
+
+      final cachedPost = _cachedPostsBox.get(postId);
+      if (cachedPost != null) {
+        final data = Map<String, dynamic>.from(
+          jsonDecode(cachedPost.cachedData) as Map,
+        );
+        data['status'] = PostStatus.rejected.name;
+        cachedPost.cachedData = jsonEncode(data);
+        cachedPost.cachedAt = DateTime.now();
+        await _cachedPostsBox.put(postId, cachedPost);
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Failed to reject post $postId: $e');
+      return false;
+    }
+  }
+
   int get pendingQueueLength =>
       _queueBox.values.where((entry) => !entry.isProcessed).length;
 

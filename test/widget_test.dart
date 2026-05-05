@@ -1,10 +1,13 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:voice_of_polban/screens/debug_dashboard.dart';
+import 'package:voice_of_polban/auth/auth_view.dart';
 
 void main() {
-  test('debug dashboard widget can be constructed', () {
-    const widget = DebugDashboard();
+  testWidgets('Auth view smoke test', (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(home: LoginView()));
 
-    expect(widget, isNotNull);
+    expect(find.text('VOP'), findsOneWidget);
+    expect(find.text('Masuk'), findsOneWidget);
+    expect(find.text('Daftar'), findsOneWidget);
   });
 }

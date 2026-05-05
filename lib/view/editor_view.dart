@@ -1,10 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../models/article_model.dart';
-import '../models/user_model.dart';
-import '../models/app_enums.dart';
-import '../controller/article_controller.dart';
-import '../auth/auth_service.dart';
+import 'package:intl/intl.dart';
+
+import '../controller/post_controller.dart';
+import '../models/cached_post.dart';
+import '../models/cached_user.dart';
 import 'article_view.dart';
 
 class EditorPage extends StatefulWidget {
@@ -15,142 +17,62 @@ class EditorPage extends StatefulWidget {
 }
 
 class _EditorPageState extends State<EditorPage> {
-  final AuthService _authService = AuthService();
-  late final ArticleController _controller;
+  final PostController _controller = PostController();
+  late Future<List<CachedPost>> _pendingPostsFuture;
 
   @override
   void initState() {
     super.initState();
-    _controller = ArticleController(authService: _authService);
+    _pendingPostsFuture = _controller.fetchPendingPosts();
   }
 
-  // Helper to resolve Foreign Key (authorId) to Real Name
   String _getAuthorName(String authorId) {
-    final user = Hive.box<UserModel>('user_box').get(authorId);
-    return user?.name ?? "Penulis Tidak Diketahui";
+    final user = Hive.box<CachedUser>('cached_user_box').get(authorId);
+    return user?.name ?? 'Penulis Tidak Diketahui';
   }
 
-  // The Review Dialog to enforce your Anti-Mass-Approval rule
-  void _showReviewDialog(
-    BuildContext context,
-    ArticleModel article,
-    bool isApprove,
-  ) {
-    final TextEditingController noteController = TextEditingController();
-    String? errorMessage;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF1E1E1E),
-              title: Text(
-                isApprove ? "Publikasi Artikel" : "Tolak Artikel",
-                style: const TextStyle(color: Colors.white),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    "Masukkan catatan untuk penulis:",
-                    style: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: noteController,
-                    style: const TextStyle(color: Colors.white),
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: "Tulis catatan review...",
-                      hintStyle: const TextStyle(color: Colors.grey),
-                      filled: true,
-                      fillColor: const Color(0xFF121212),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  if (errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Text(
-                        errorMessage!,
-                        style: const TextStyle(color: Colors.red, fontSize: 12),
-                      ),
-                    ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    "Batal",
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isApprove ? Colors.green : Colors.red,
-                  ),
-                  onPressed: () {
-                    // Call the controller method
-                    final error = _controller.reviewArticle(
-                      articleId: article.articleId,
-                      approved: isApprove,
-                      note: noteController.text,
-                    );
-
-                    if (error != null) {
-                      // Trigger red error text
-                      setState(() {
-                        errorMessage = error;
-                      });
-                    } else {
-                      // If approved, automatically publish it to the feed
-                      if (isApprove) {
-                        _controller.publishArticle(article.articleId);
-                      }
-                      Navigator.pop(context); // Close dialog
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            isApprove
-                                ? "Artikel Dipublikasikan!"
-                                : "Artikel Ditolak",
-                          ),
-                          backgroundColor: isApprove
-                              ? Colors.green
-                              : Colors.red,
-                        ),
-                      );
-                    }
-                  },
-                  child: Text(
-                    isApprove ? "Publikasi" : "Tolak",
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+  Map<String, dynamic> _parsePostData(CachedPost post) {
+    final decoded = jsonDecode(post.cachedData);
+    if (decoded is Map<String, dynamic>) {
+      return decoded;
+    }
+    return <String, dynamic>{};
   }
 
-  // Handles the "Drop" (Delete) action
-  void _dropArticle(ArticleModel article) {
-    Hive.box<ArticleModel>('article_box').delete(article.articleId);
+  Future<void> _refresh() async {
+    setState(() {
+      _pendingPostsFuture = _controller.fetchPendingPosts();
+    });
+  }
+
+  Future<void> _approvePost(CachedPost post) async {
+    final ok = await _controller.approvePost(post.postId);
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Artikel di-drop (dihapus)."),
-        backgroundColor: Colors.red,
+      SnackBar(
+        content: Text(
+          ok ? 'Artikel dipublikasikan.' : 'Gagal mempublikasikan artikel.',
+        ),
+        backgroundColor: ok ? Colors.green : Colors.red,
       ),
     );
+    if (ok) {
+      await _refresh();
+    }
+  }
+
+  Future<void> _rejectPost(CachedPost post) async {
+    final ok = await _controller.rejectPost(post.postId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Artikel ditolak.' : 'Gagal menolak artikel.'),
+        backgroundColor: ok ? Colors.orange : Colors.red,
+      ),
+    );
+    if (ok) {
+      await _refresh();
+    }
   }
 
   @override
@@ -165,7 +87,7 @@ class _EditorPageState extends State<EditorPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          "VOP",
+          'VOP',
           style: TextStyle(
             color: Color(0xFF000080),
             fontSize: 24,
@@ -184,42 +106,58 @@ class _EditorPageState extends State<EditorPage> {
           ),
         ],
       ),
-      body: ValueListenableBuilder<Box<ArticleModel>>(
-        valueListenable: Hive.box<ArticleModel>('article_box').listenable(),
-        builder: (context, box, _) {
-          // Fetch articles that are waiting for editor review (Drafts)
-          final pendingArticles =
-              box.values
-                  .where(
-                    (a) =>
-                        a.status == ArticleStatus.draft ||
-                        a.status == ArticleStatus.pending,
-                  )
-                  .toList()
-                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      body: FutureBuilder<List<CachedPost>>(
+        future: _pendingPostsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFFFF8C00)),
+            );
+          }
 
-          if (pendingArticles.isEmpty) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Gagal memuat antrian review: ${snapshot.error}',
+                style: const TextStyle(color: Colors.white),
+              ),
+            );
+          }
+
+          final posts = snapshot.data ?? <CachedPost>[];
+          if (posts.isEmpty) {
             return const Center(
               child: Text(
-                "Tidak ada artikel yang perlu direview.",
+                'Tidak ada artikel yang perlu direview.',
                 style: TextStyle(color: Colors.grey, fontSize: 16),
               ),
             );
           }
 
-          return ListView.builder(
-            itemCount: pendingArticles.length,
-            itemBuilder: (context, index) {
-              return _buildEditorCard(context, pendingArticles[index]);
-            },
+          return RefreshIndicator(
+            color: const Color(0xFFFF8C00),
+            onRefresh: _refresh,
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: posts.length,
+              itemBuilder: (context, index) {
+                return _buildEditorCard(context, posts[index]);
+              },
+            ),
           );
         },
       ),
     );
   }
 
-  Widget _buildEditorCard(BuildContext context, ArticleModel article) {
-    final authorName = _getAuthorName(article.authorId);
+  Widget _buildEditorCard(BuildContext context, CachedPost post) {
+    final data = _parsePostData(post);
+    final title = data['title']?.toString() ?? 'Tanpa Judul';
+    final content = data['content']?.toString() ?? '';
+    final authorId = data['author_id']?.toString() ?? '';
+    final status = data['status']?.toString() ?? 'pending';
+    final createdAt = DateFormat('dd MMMM yyyy').format(post.cachedAt);
+    final authorName = _getAuthorName(authorId);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -231,7 +169,6 @@ class _EditorPageState extends State<EditorPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 👤 Author
           Row(
             children: [
               const CircleAvatar(
@@ -241,45 +178,56 @@ class _EditorPageState extends State<EditorPage> {
                 ),
               ),
               const SizedBox(width: 10),
-              Text(
-                authorName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      authorName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    Text(
+                      '$createdAt • ${status.toUpperCase()}',
+                      style: const TextStyle(color: Colors.grey, fontSize: 11),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-
           const SizedBox(height: 12),
-
-          // 📝 Title
           Text(
-            article.title,
+            title,
             style: const TextStyle(
               color: Colors.white,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
-
-          const SizedBox(height: 12),
-
-          // 🖼 Image / Content Preview
+          const SizedBox(height: 8),
+          Text(
+            content,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white70, height: 1.4),
+          ),
+          const SizedBox(height: 16),
           InkWell(
             borderRadius: BorderRadius.circular(12),
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) =>
-                      ArticlePage(articleId: article.articleId),
+                  builder: (context) => ArticlePage(articleId: post.postId),
                 ),
               );
             },
             child: Container(
-              height: 180,
+              height: 120,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: const Color(0xFF2A2A2A),
@@ -287,38 +235,28 @@ class _EditorPageState extends State<EditorPage> {
               ),
               child: const Center(
                 child: Text(
-                  "Tap untuk membaca artikel",
+                  'Tap untuk membaca artikel',
                   style: TextStyle(color: Colors.grey),
                 ),
               ),
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // 🎯 Actions (clean pill style)
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               _buildActionButton(
                 icon: Icons.check,
                 color: Colors.green,
-                label: "Publikasi",
-                onTap: () => _showReviewDialog(context, article, true),
+                label: 'Publikasi',
+                onTap: () => _approvePost(post),
               ),
               const SizedBox(width: 10),
               _buildActionButton(
                 icon: Icons.close,
                 color: Colors.red,
-                label: "Tolak",
-                onTap: () => _showReviewDialog(context, article, false),
-              ),
-              const SizedBox(width: 10),
-              _buildActionButton(
-                icon: Icons.delete_outline,
-                color: Colors.red.shade900,
-                label: "Drop",
-                onTap: () => _dropArticle(article),
+                label: 'Tolak',
+                onTap: () => _rejectPost(post),
               ),
             ],
           ),
