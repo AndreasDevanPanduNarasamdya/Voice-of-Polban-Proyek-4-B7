@@ -14,6 +14,7 @@ class ArticleModel {
     required this.status,
     this.rejectionNote,
     required this.createdAt,
+    this.imageUrl,
   });
 
   @HiveField(0)
@@ -43,6 +44,9 @@ class ArticleModel {
   @HiveField(8)
   final DateTime createdAt;
 
+  @HiveField(9)
+  final String? imageUrl;
+
   ArticleModel copyWith({
     String? title,
     String? content,
@@ -50,6 +54,7 @@ class ArticleModel {
     ArticleStatus? status,
     String? editorId,
     String? rejectionNote,
+    String? imageUrl,
   }) {
     return ArticleModel(
       articleId: articleId,
@@ -61,6 +66,7 @@ class ArticleModel {
       status: status ?? this.status,
       rejectionNote: rejectionNote ?? this.rejectionNote,
       createdAt: createdAt,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 }

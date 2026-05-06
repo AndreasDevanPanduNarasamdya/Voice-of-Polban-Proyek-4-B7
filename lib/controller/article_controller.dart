@@ -1,6 +1,8 @@
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import 'package:voice_of_polban/auth/auth_service.dart';
+import 'dart:io';
+import 'dart:convert';
 import '../models/app_enums.dart';
 import '../models/article_model.dart';
 import '../models/user_model.dart';
@@ -45,10 +47,22 @@ class ArticleController {
     required String title,
     required String content,
     required String sectionId,
+    File? imageFile,
   }) {
     final currentUserId = _authService.getCurrentUserId();
 
     if (currentUserId == null) return;
+
+    // Convert image to base64 if provided
+    String? imageUrl;
+    if (imageFile != null) {
+      try {
+        final bytes = imageFile.readAsBytesSync();
+        imageUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      } catch (e) {
+        print('Error converting image: $e');
+      }
+    }
 
     final newArticle = ArticleModel(
       articleId: _uuid.v4(),
@@ -59,6 +73,7 @@ class ArticleController {
       editorId: null,
       status: ArticleStatus.draft,
       createdAt: DateTime.now(),
+      imageUrl: imageUrl,
     );
 
     _articlesBox.put(newArticle.articleId, newArticle);
@@ -83,6 +98,13 @@ class ArticleController {
               a.status == ArticleStatus.pending ||
               a.status == ArticleStatus.draft,
         )
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  List<ArticleModel> getArticlesByAuthor(String authorId) {
+    return _articlesBox.values
+        .where((article) => article.authorId == authorId)
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }

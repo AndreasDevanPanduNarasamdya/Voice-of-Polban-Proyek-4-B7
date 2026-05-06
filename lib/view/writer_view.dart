@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../controller/article_controller.dart';
 import '../auth/auth_service.dart';
 
@@ -18,6 +20,8 @@ class _WriterPageState extends State<WriterPage> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
   String? _selectedSectionId;
+  File? _selectedImage;
+  final ImagePicker _imagePicker = ImagePicker();
 
   // 3. Mock Sections (Usually fetched from a SectionBox in Hive)
   final List<Map<String, String>> _sections = [
@@ -41,6 +45,26 @@ class _WriterPageState extends State<WriterPage> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error memilih gambar: $e')),
+      );
+    }
+  }
+
   void _submitDraft() {
     final title = _titleController.text.trim();
     final content = _contentController.text.trim();
@@ -56,11 +80,12 @@ class _WriterPageState extends State<WriterPage> {
       return;
     }
 
-    // Call the Domain Controller
+    // Call the Domain Controller with image
     _articleController.createDraft(
       title: title,
       content: content,
       sectionId: _selectedSectionId!,
+      imageFile: _selectedImage,
     );
 
     // Give UX feedback and return to feed
@@ -123,7 +148,7 @@ class _WriterPageState extends State<WriterPage> {
               ),
               const SizedBox(height: 16),
 
-              // --- IMAGE UPLOAD (Placeholder) ---
+              // --- IMAGE UPLOAD (Functional) ---
               Container(
                 height: 180,
                 padding: const EdgeInsets.all(16),
@@ -131,45 +156,103 @@ class _WriterPageState extends State<WriterPage> {
                   color: const Color(0xFF1A1A1A),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      "Tambah Gambar Depan",
-                      style: TextStyle(color: Colors.grey, fontSize: 16),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(
-                            Icons.insert_drive_file_outlined,
-                            size: 12,
-                            color: Colors.black,
+                child: _selectedImage == null
+                    ? InkWell(
+                        onTap: _pickImage,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              "Tambah Gambar Depan",
+                              style: TextStyle(color: Colors.grey, fontSize: 16),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade300,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(
+                                    Icons.image_outlined,
+                                    size: 12,
+                                    color: Colors.black,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    "Pilih Gambar",
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.file(
+                              _selectedImage!,
+                              fit: BoxFit.cover,
+                            ),
                           ),
-                          SizedBox(width: 4),
-                          Text(
-                            "Tambah Gambar",
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedImage = null;
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 8,
+                            right: 8,
+                            child: GestureDetector(
+                              onTap: _pickImage,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF8C00),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.edit,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
               ),
               const SizedBox(height: 16),
 
