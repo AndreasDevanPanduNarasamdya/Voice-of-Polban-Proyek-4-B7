@@ -153,32 +153,43 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
+  String _formatDate(DateTime dt) {
+    const days = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
+    const months = [
+      'Januari','Februari','Maret','April','Mei','Juni',
+      'Juli','Agustus','September','Oktober','November','Desember'
+    ];
+    return '${days[dt.weekday - 1]}, ${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF1A1A1A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF121212),
+        backgroundColor: const Color(0xFF1A1A1A),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Color(0xFFFF8C00)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          "VOP",
-          style: TextStyle(
-            color: Color(0xFF000080),
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 2,
+        title: RichText(
+          text: const TextSpan(
+            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+            children: [
+              TextSpan(text: 'V', style: TextStyle(color: Color(0xFFFF6D00))),
+              TextSpan(text: 'O', style: TextStyle(color: Colors.white)),
+              TextSpan(text: 'P', style: TextStyle(color: Color(0xFFFF6D00))),
+            ],
           ),
         ),
         centerTitle: true,
         actions: const [
           Padding(
-            padding: EdgeInsets.only(right: 16.0),
+            padding: EdgeInsets.only(right: 14),
             child: CircleAvatar(
-              radius: 16,
+              radius: 18,
+              backgroundColor: Color(0xFFFF6D00),
               backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
             ),
           ),
@@ -187,31 +198,32 @@ class _EditorPageState extends State<EditorPage> {
       body: ValueListenableBuilder<Box<ArticleModel>>(
         valueListenable: Hive.box<ArticleModel>('article_box').listenable(),
         builder: (context, box, _) {
-          // Fetch articles that are waiting for editor review (Drafts)
-          final pendingArticles =
-              box.values
-                  .where(
-                    (a) =>
-                        a.status == ArticleStatus.draft ||
-                        a.status == ArticleStatus.pending,
-                  )
-                  .toList()
-                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          final pendingArticles = box.values
+              .where((a) =>
+                  a.status == ArticleStatus.draft ||
+                  a.status == ArticleStatus.pending)
+              .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
           if (pendingArticles.isEmpty) {
             return const Center(
-              child: Text(
-                "Tidak ada artikel yang perlu direview.",
-                style: TextStyle(color: Colors.grey, fontSize: 16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.inbox_outlined, color: Colors.white24, size: 56),
+                  SizedBox(height: 12),
+                  Text('Tidak ada artikel yang perlu direview.',
+                      style: TextStyle(color: Colors.white38, fontSize: 15)),
+                ],
               ),
             );
           }
 
           return ListView.builder(
+            padding: const EdgeInsets.only(top: 8, bottom: 24),
             itemCount: pendingArticles.length,
-            itemBuilder: (context, index) {
-              return _buildEditorCard(context, pendingArticles[index]);
-            },
+            itemBuilder: (context, index) =>
+                _buildEditorCard(context, pendingArticles[index]),
           );
         },
       ),
@@ -220,104 +232,100 @@ class _EditorPageState extends State<EditorPage> {
 
   Widget _buildEditorCard(BuildContext context, ArticleModel article) {
     final authorName = _getAuthorName(article.authorId);
+    final dateStr = _formatDate(article.createdAt);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(16),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0xFF2A2A2A), width: 1)),
       ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 👤 Author
+          // Author + role badge
           Row(
             children: [
               const CircleAvatar(
-                radius: 14,
-                backgroundImage: NetworkImage(
-                  'https://i.pravatar.cc/100?img=11',
-                ),
+                radius: 16,
+                backgroundColor: Color(0xFFFF6D00),
+                backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=11'),
               ),
               const SizedBox(width: 10),
-              Text(
-                authorName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Writter',
+                      style: TextStyle(color: Colors.white54, fontSize: 11)),
+                  Text(authorName,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13)),
+                ],
               ),
+              const Spacer(),
+              Text(dateStr,
+                  style: const TextStyle(color: Colors.white38, fontSize: 11)),
             ],
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
-          // 📝 Title
+          // Judul artikel
           Text(
             article.title,
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+                color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 12),
 
-          // 🖼 Image / Content Preview
+          // Preview konten — tap untuk baca
           InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      ArticlePage(articleId: article.articleId),
-                ),
-              );
-            },
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => ArticlePage(articleId: article.articleId)),
+            ),
             child: Container(
-              height: 180,
+              height: 160,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: const Color(0xFF2A2A2A),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: const Center(
-                child: Text(
-                  "Tap untuk membaca artikel",
-                  style: TextStyle(color: Colors.grey),
-                ),
+                child: Text('Tap untuk membaca artikel',
+                    style: TextStyle(color: Colors.white38, fontSize: 13)),
               ),
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // 🎯 Actions (clean pill style)
+          // Tombol aksi: Publikasi | Tolak | Drop
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               _buildActionButton(
                 icon: Icons.check,
                 color: Colors.green,
-                label: "Publikasi",
+                label: 'Publikasi',
                 onTap: () => _showReviewDialog(context, article, true),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               _buildActionButton(
                 icon: Icons.close,
                 color: Colors.red,
-                label: "Tolak",
+                label: 'Tolak',
                 onTap: () => _showReviewDialog(context, article, false),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               _buildActionButton(
                 icon: Icons.delete_outline,
-                color: Colors.red.shade900,
-                label: "Drop",
+                color: Colors.red,
+                label: 'Drop',
                 onTap: () => _dropArticle(article),
               ),
             ],
@@ -337,23 +345,21 @@ class _EditorPageState extends State<EditorPage> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: const Color(0xFF2A2A2A),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 18),
+            Icon(icon, color: color, size: 16),
             const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text(label,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
           ],
         ),
       ),

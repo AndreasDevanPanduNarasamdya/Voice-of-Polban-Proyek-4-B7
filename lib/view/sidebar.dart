@@ -59,7 +59,7 @@ class AppSidebar extends StatelessWidget {
           _tile(context, Icons.bookmark_border, 'Tersimpan',
               onTap: () => Navigator.pop(context)),
 
-          // ── Tulis Post (writer) / Lihat Draft (editor) ──
+          // ── Tulis Post (writer only) ──
           if (currentUserRole == UserRole.writer)
             _tile(context, Icons.edit_outlined, 'Tulis Post', onTap: () {
               Navigator.pop(context);
@@ -67,18 +67,16 @@ class AppSidebar extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const WriterPage()));
             }),
 
-          if (currentUserRole == UserRole.editor)
-            _tile(context, Icons.edit_outlined, 'Tulis Post', onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const WriterPage()));
-            }),
-
-          // ── Lihat Draft ──
+          // ── Lihat Draft: writer → DraftPage, editor → EditorPage ──
           _tile(context, Icons.inbox_outlined, 'Lihat Draft', onTap: () {
             Navigator.pop(context);
-            Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const DraftPage()));
+            if (currentUserRole == UserRole.editor) {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const EditorPage()));
+            } else {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const DraftPage()));
+            }
           }),
 
           // ── Pengaturan ──
@@ -89,9 +87,7 @@ class AppSidebar extends StatelessWidget {
               MaterialPageRoute(
                 builder: (_) => SettingsPage(
                   userName: 'James McGill',
-                  role: currentUserRole == UserRole.writer
-                      ? UserRole.writer
-                      : UserRole.editor,
+                  role: currentUserRole,
                 ),
               ),
             );
