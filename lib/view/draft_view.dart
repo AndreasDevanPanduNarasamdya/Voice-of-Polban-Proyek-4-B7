@@ -17,9 +17,6 @@ class DraftPage extends StatefulWidget {
 class _DraftPageState extends State<DraftPage> {
   static const Color _bgColor     = Color(0xFF1A1A1A);
   static const Color _orangeColor = Color(0xFFFF6D00);
-  static const Color _redColor    = Color(0xFFE53935);
-  static const Color _greenColor  = Color(0xFF43A047);
-  static const Color _dividerColor = Color(0xFF333333);
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final AuthService _authService = AuthService();
@@ -31,7 +28,6 @@ class _DraftPageState extends State<DraftPage> {
     _articleController = ArticleController(authService: _authService);
   }
 
-  // Ambil semua artikel milik user yang sedang login, diurutkan terbaru
   List<ArticleModel> _getMyArticles() {
     final currentUserId = _authService.getCurrentUserId();
     if (currentUserId == null) return [];
@@ -42,13 +38,11 @@ class _DraftPageState extends State<DraftPage> {
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
-  // Ambil nama penulis dari user_box berdasarkan authorId
   String _getAuthorName(String authorId) {
     final box = Hive.box<UserModel>('user_box');
     return box.get(authorId)?.name ?? 'Penulis';
   }
 
-  // Format DateTime ke format Indonesia
   String _formatDate(DateTime dt) {
     const days = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
     const months = [
@@ -70,7 +64,16 @@ class _DraftPageState extends State<DraftPage> {
           icon: const Icon(Icons.arrow_back_ios, color: _orangeColor, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: _buildLogo(),
+        title: RichText(
+          text: const TextSpan(
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+            children: [
+              TextSpan(text: 'V', style: TextStyle(color: Color(0xFFFF6D00))),
+              TextSpan(text: 'o', style: TextStyle(color: Colors.white)),
+              TextSpan(text: 'P', style: TextStyle(color: Color(0xFFFF6D00))),
+            ],
+          ),
+        ),
         centerTitle: true,
         actions: [
           Padding(
@@ -83,7 +86,6 @@ class _DraftPageState extends State<DraftPage> {
           ),
         ],
       ),
-      // ValueListenableBuilder: otomatis rebuild saat Hive box berubah
       body: ValueListenableBuilder(
         valueListenable: Hive.box<ArticleModel>('article_box').listenable(),
         builder: (context, Box<ArticleModel> box, _) {
@@ -102,230 +104,279 @@ class _DraftPageState extends State<DraftPage> {
             );
           }
           return ListView.builder(
-            padding: const EdgeInsets.only(top: 8, bottom: 24),
+            padding: const EdgeInsets.only(top: 4, bottom: 24),
             itemCount: articles.length,
-            itemBuilder: (ctx, i) => _buildDraftCard(ctx, articles[i]),
+            itemBuilder: (ctx, i) => _DraftCard(
+              article: articles[i],
+              authorName: _getAuthorName(articles[i].authorId),
+              dateStr: _formatDate(articles[i].createdAt),
+              controller: _articleController,
+            ),
           );
         },
       ),
     );
   }
+}
 
-  Widget _buildLogo() {
-    return RichText(
-      text: const TextSpan(
-        style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-        children: [
-          TextSpan(text: 'V', style: TextStyle(color: Color(0xFFFF6D00))),
-          TextSpan(text: 'o', style: TextStyle(color: Colors.white)),
-          TextSpan(text: 'P', style: TextStyle(color: Color(0xFFFF6D00))),
-        ],
-      ),
-    );
-  }
+// ── Card sebagai StatefulWidget agar tiap card punya state expand sendiri ──
+class _DraftCard extends StatefulWidget {
+  final ArticleModel article;
+  final String authorName;
+  final String dateStr;
+  final ArticleController controller;
 
-  Widget _buildDraftCard(BuildContext context, ArticleModel article) {
-    final authorName = _getAuthorName(article.authorId);
-    final dateStr = _formatDate(article.createdAt);
+  const _DraftCard({
+    required this.article,
+    required this.authorName,
+    required this.dateStr,
+    required this.controller,
+  });
+
+  @override
+  State<_DraftCard> createState() => _DraftCardState();
+}
+
+class _DraftCardState extends State<_DraftCard> {
+  bool _expanded = false;
+
+  static const Color _bgColor      = Color(0xFF1A1A1A);
+  static const Color _redColor     = Color(0xFFE53935);
+  static const Color _greenColor   = Color(0xFF43A047);
+  static const Color _orangeColor  = Color(0xFFFF6D00);
+  static const Color _dividerColor = Color(0xFF333333);
+
+  @override
+  Widget build(BuildContext context) {
+    final article = widget.article;
 
     return Container(
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Color(0xFF2A2A2A), width: 1)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Author + tanggal
-            Row(
-              children: [
-                const CircleAvatar(
-                  radius: 12,
-                  backgroundColor: Color(0xFF444444),
-                  child: Icon(Icons.person, color: Colors.white60, size: 14),
-                ),
-                const SizedBox(width: 8),
-                Text(authorName,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                const SizedBox(width: 8),
-                Text(dateStr,
-                    style: const TextStyle(color: Colors.white38, fontSize: 12)),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Judul
-            Text(
-              article.title,
-              style: const TextStyle(
-                  color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-
-            // Lihat gambar (placeholder, gambar belum diimplementasi di writer)
-            Center(
-              child: TextButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.keyboard_arrow_down,
-                    color: Colors.white54, size: 18),
-                label: const Text('Lihat Gambar',
-                    style: TextStyle(color: Colors.white54, fontSize: 13)),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Author + tanggal ──
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 12,
+                backgroundColor: Color(0xFF444444),
+                child: Icon(Icons.person, color: Colors.white60, size: 14),
               ),
-            ),
-
-            // Tampilan berbeda berdasarkan status artikel
-            if (article.status == ArticleStatus.rejected) ...[
-              if (article.rejectionNote != null &&
-                  article.rejectionNote!.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _bgColor,
-                    border: Border.all(color: _dividerColor),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Komentar:',
-                          style: TextStyle(color: Colors.white70, fontSize: 13)),
-                      const SizedBox(height: 6),
-                      Text(article.rejectionNote!,
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 14)),
-                    ],
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _actionBtn(
-                    icon: Icons.edit,
-                    label: 'Edit',
-                    color: Colors.white,
-                    bgColor: const Color(0xFF333333),
-                    onTap: () {
-                      // Navigasi ke WriterPage untuk edit ulang
-                      Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const WriterPage()));
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  _actionBtn(
-                    icon: Icons.delete,
-                    label: 'Drop',
-                    color: _redColor,
-                    bgColor: const Color(0xFF333333),
-                    onTap: () {
-                      _articleController.deleteArticle(article.articleId);
-                    },
-                  ),
-                  const Spacer(),
-                  _statusChip(
-                    icon: Icons.close,
-                    label: 'Ditolak',
-                    color: _redColor,
-                  ),
-                ],
-              ),
-
-            ] else if (article.status == ArticleStatus.published) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF333333),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.arrow_upward,
-                            color: Color(0xFFFF6D00), size: 16),
-                        SizedBox(width: 6),
-                        Text('0',
-                            style: TextStyle(color: Colors.white, fontSize: 14)),
-                      ],
-                    ),
-                  ),
-                  const Spacer(),
-                  _statusChip(
-                    icon: Icons.check,
-                    label: 'Terpublikasi',
-                    color: _greenColor,
-                  ),
-                ],
-              ),
-
-            ] else if (article.status == ArticleStatus.archived) ...[
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  _statusChip(
-                    icon: Icons.delete,
-                    label: 'Dihapus',
-                    color: _redColor,
-                  ),
-                ],
-              ),
-
-            ] else if (article.status == ArticleStatus.pending) ...[
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  _statusChip(
-                    icon: Icons.hourglass_empty,
-                    label: 'Menunggu Review',
-                    color: Colors.orange,
-                  ),
-                ],
-              ),
-
-            ] else if (article.status == ArticleStatus.draft) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _actionBtn(
-                    icon: Icons.edit,
-                    label: 'Edit',
-                    color: Colors.white,
-                    bgColor: const Color(0xFF333333),
-                    onTap: () {
-                      Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const WriterPage()));
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  _actionBtn(
-                    icon: Icons.delete,
-                    label: 'Hapus',
-                    color: _redColor,
-                    bgColor: const Color(0xFF333333),
-                    onTap: () {
-                      _articleController.deleteArticle(article.articleId);
-                    },
-                  ),
-                  const Spacer(),
-                  _statusChip(
-                    icon: Icons.edit_note,
-                    label: 'Draft',
-                    color: Colors.white54,
-                  ),
-                ],
-              ),
+              const SizedBox(width: 8),
+              Text(widget.authorName,
+                  style: const TextStyle(color: Colors.white70, fontSize: 13)),
+              const SizedBox(width: 8),
+              Text(widget.dateStr,
+                  style: const TextStyle(color: Colors.white38, fontSize: 12)),
             ],
+          ),
+          const SizedBox(height: 10),
+
+          // ── Judul ──
+          Text(
+            article.title,
+            style: const TextStyle(
+                color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+
+          // ── Tombol "Lihat Gambar" / collapse ──
+          GestureDetector(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  color: Colors.white54,
+                  size: 18,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _expanded ? 'Sembunyikan' : 'Lihat Gambar',
+                  style: const TextStyle(color: Colors.white54, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Konten artikel (expandable) ──
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 250),
+            crossFadeState: _expanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            firstChild: Container(
+              margin: const EdgeInsets.only(top: 10),
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF252525),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _dividerColor),
+              ),
+              child: Text(
+                article.content,
+                style: const TextStyle(
+                    color: Colors.white12, fontSize: 14, height: 1.6),
+              ),
+            ),
+            secondChild: const SizedBox.shrink(),
+          ),
+
+          // ── Komentar penolakan (hanya jika rejected) ──
+          if (article.status == ArticleStatus.rejected &&
+              article.rejectionNote != null &&
+              article.rejectionNote!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _bgColor,
+                border: Border.all(color: _dividerColor),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Komentar:',
+                      style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  Text(article.rejectionNote!,
+                      style:
+                          const TextStyle(color: Colors.white, fontSize: 14)),
+                ],
+              ),
+            ),
           ],
-        ),
+
+          const SizedBox(height: 12),
+
+          // ── Tombol aksi berdasarkan status ──
+          _buildStatusRow(article),
+        ],
       ),
     );
+  }
+
+  Widget _buildStatusRow(ArticleModel article) {
+    switch (article.status) {
+      // Ditolak: Edit + Drop (kiri), chip Ditolak (kanan)
+      case ArticleStatus.rejected:
+        return Row(
+          children: [
+            _actionBtn(
+              icon: Icons.edit,
+              label: 'Edit',
+              color: Colors.white,
+              bgColor: const Color(0xFF333333),
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const WriterPage())),
+            ),
+            const SizedBox(width: 8),
+            _actionBtn(
+              icon: Icons.delete,
+              label: 'Drop',
+              color: _redColor,
+              bgColor: const Color(0xFF333333),
+              onTap: () => widget.controller.deleteArticle(article.articleId),
+            ),
+            const Spacer(),
+            _statusChip(
+                icon: Icons.close, label: 'Ditolak', color: _redColor,
+                filled: true),
+          ],
+        );
+
+      // Terpublikasi: upvote count (kiri), chip hijau (kanan)
+      case ArticleStatus.published:
+        return Row(
+          children: [
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFF333333),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.arrow_upward, color: _orangeColor, size: 16),
+                  SizedBox(width: 6),
+                  Text('300',
+                      style:
+                          TextStyle(color: Colors.white, fontSize: 14)),
+                ],
+              ),
+            ),
+            const Spacer(),
+            _statusChip(
+                icon: Icons.check,
+                label: 'Terpublikasi',
+                color: _greenColor,
+                filled: true),
+          ],
+        );
+
+      // Dihapus/Archived: chip merah (kanan saja)
+      case ArticleStatus.archived:
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            _statusChip(
+                icon: Icons.delete, label: 'Dihapus', color: _redColor,
+                filled: true),
+          ],
+        );
+
+      // Menunggu review: chip orange (kanan saja)
+      case ArticleStatus.pending:
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            _statusChip(
+                icon: Icons.hourglass_empty,
+                label: 'Menunggu Review',
+                color: Colors.orange,
+                filled: false),
+          ],
+        );
+
+      // Draft: Edit + Hapus (kiri), chip abu (kanan)
+      case ArticleStatus.draft:
+      default:
+        return Row(
+          children: [
+            _actionBtn(
+              icon: Icons.edit,
+              label: 'Edit',
+              color: Colors.white,
+              bgColor: const Color(0xFF333333),
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const WriterPage())),
+            ),
+            const SizedBox(width: 8),
+            _actionBtn(
+              icon: Icons.delete,
+              label: 'Hapus',
+              color: _redColor,
+              bgColor: const Color(0xFF333333),
+              onTap: () => widget.controller.deleteArticle(article.articleId),
+            ),
+            const Spacer(),
+            _statusChip(
+                icon: Icons.edit_note,
+                label: 'Draft',
+                color: Colors.white54,
+                filled: false),
+          ],
+        );
+    }
   }
 
   Widget _actionBtn({
@@ -358,19 +409,23 @@ class _DraftPageState extends State<DraftPage> {
     required IconData icon,
     required String label,
     required Color color,
+    required bool filled,
   }) =>
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF2A2A2A),
+          color: filled ? color.withOpacity(0.15) : const Color(0xFF2A2A2A),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.4)),
+          border: Border.all(color: color.withOpacity(0.5)),
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 16),
+            Icon(icon, color: color, size: 15),
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(color: color, fontSize: 13)),
+            Text(label,
+                style: TextStyle(
+                    color: color, fontSize: 12, fontWeight: FontWeight.w600)),
           ],
         ),
       );
