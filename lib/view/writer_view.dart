@@ -32,6 +32,15 @@ class _WriterPageState extends State<WriterPage> {
   String? _selectedSectionId;
 
   @override
+  void initState() {
+    super.initState();
+    // Load the session so _currentUserId is no longer null
+    _authController.restoreSession().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   void dispose() {
     _titleController.dispose();
     _contentController.dispose();
@@ -107,19 +116,17 @@ class _WriterPageState extends State<WriterPage> {
     try {
       final queueEntry = await _postController.submitDraft(_draft!.localId);
       if (!mounted) return;
+
+      // queueEntry is null if it went straight to Supabase (Success)
+      // queueEntry is NOT null if it was queued for offline (Success)
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            queueEntry == null
-                ? 'Draft tidak ditemukan.'
-                : 'Draf dikirim untuk review: ${queueEntry.queueId}.',
-          ),
-          backgroundColor: queueEntry == null ? Colors.red : Colors.green,
+        const SnackBar(
+          content: Text('Artikel berhasil dikirim!'),
+          backgroundColor: Colors.green,
         ),
       );
-      if (queueEntry != null) {
-        Navigator.pop(context);
-      }
+      Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

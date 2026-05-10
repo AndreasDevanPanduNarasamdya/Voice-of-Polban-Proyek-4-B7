@@ -17,7 +17,7 @@ class _LoginState extends State<LoginView> {
   final AuthController _controller = AuthController();
   final _formKey = GlobalKey<FormState>();
 
-  final TextEditingController _inputController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
   String? _errorMessage;
@@ -26,7 +26,7 @@ class _LoginState extends State<LoginView> {
 
   @override
   void dispose() {
-    _inputController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -43,7 +43,7 @@ class _LoginState extends State<LoginView> {
     }
 
     final user = await _controller.login(
-      _inputController.text,
+      _emailController.text,
       _passwordController.text,
     );
 
@@ -56,7 +56,7 @@ class _LoginState extends State<LoginView> {
         MaterialPageRoute(builder: (_) => const HomePage()),
       );
     } else {
-      setState(() => _errorMessage = 'Email/nama atau kata sandi salah.');
+      setState(() => _errorMessage = 'Email atau kata sandi salah.');
     }
   }
 
@@ -92,11 +92,13 @@ class _LoginState extends State<LoginView> {
                 const SizedBox(height: 60),
 
                 // ── Input email/nama ──
+                // ── Input email ──
                 TextFormField(
-                  controller: _inputController,
+                  controller: _emailController,
                   style: const TextStyle(color: Colors.white),
+                  keyboardType: TextInputType.emailAddress, // Added to show @ on keyboard
                   decoration: InputDecoration(
-                    hintText: "Nama atau Email",
+                    hintText: "Email",
                     hintStyle: const TextStyle(color: Colors.grey),
                     filled: true,
                     fillColor: const Color(0xFF1E1E1E),
@@ -109,8 +111,16 @@ class _LoginState extends State<LoginView> {
                       vertical: 16,
                     ),
                   ),
-                  validator: (value) =>
-                      value!.isEmpty ? "Tidak boleh kosong" : null,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return "Email tidak boleh kosong";
+                    }
+                    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+                    if (!emailRegex.hasMatch(value.trim())) {
+                      return 'Format email tidak valid';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
 
@@ -143,8 +153,17 @@ class _LoginState extends State<LoginView> {
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
-                  validator: (value) =>
-                      value!.isEmpty ? "Tidak boleh kosong" : null,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return "Kata sandi tidak boleh kosong";
+                    }
+
+                    if (value.trim().length < 6) {
+                      return "Kata sandi minimal 6 karakter";
+                    }
+
+                    return null;
+                  },
                 ),
 
                 // ── Error message ──
@@ -365,9 +384,8 @@ class _RegisterViewState extends State<RegisterView> {
                     if (value == null || value.trim().isEmpty) {
                       return 'Email tidak boleh kosong';
                     }
-                    final emailRegex =
-                        RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                    if (!emailRegex.hasMatch(value.trim())) {
+                    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+                    if (!emailRegex.hasMatch(value.trim())){
                       return 'Format email tidak valid';
                     }
                     return null;

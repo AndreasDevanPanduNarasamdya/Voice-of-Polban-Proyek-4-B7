@@ -65,4 +65,7 @@ Future<void> setupHive() async {
   if (!Hive.isBoxOpen('session_box')) {
     await Hive.openBox('session_box');
   }
+  if (!Hive.isBoxOpen('pending_post_box')) {
+    await Hive.openBox<CachedPost>('pending_post_box');
+  }
 }

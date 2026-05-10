@@ -25,7 +25,12 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    // Fetch latest feed on startup (updates local cache)
+    // 1. Tell the controller to load the logged-in user from Hive
+    _authController.restoreSession().then((_) {
+      // 2. Trigger a rebuild so the UI knows the role is now available
+      if (mounted) setState(() {});
+    });
+    
     _controller.fetchFeed();
   }
 
@@ -38,7 +43,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     // 1. REACTIVE SESSION: Listens to logins/logouts instantly
     return ValueListenableBuilder<Box>(
-      valueListenable: Hive.box('session_box').listenable(),
+      valueListenable: Hive.box<CachedUser>('cached_user_box').listenable(),
       builder: (context, sessionBox, _) {
         final currentUserRole =
             _authController.currentUser?.role ?? UserRole.reader;

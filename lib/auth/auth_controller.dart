@@ -14,44 +14,20 @@ class AuthController {
 
   CachedUser? get currentUser => _currentUser;
 
-  Future<void> seedDummyUsers() async {
-    final users = <CachedUser>[
-      CachedUser(
-        userId: '1',
-        name: 'Reader',
-        email: 'reader@polban.ac.id',
-        role: UserRole.reader,
-        avatarUrl: '',
-      ),
-      CachedUser(
-        userId: '2',
-        name: 'Writer',
-        email: 'writer@polban.ac.id',
-        role: UserRole.writer,
-        avatarUrl: '',
-      ),
-      CachedUser(
-        userId: '3',
-        name: 'Editor',
-        email: 'editor@polban.ac.id',
-        role: UserRole.editor,
-        avatarUrl: '',
-      ),
-    ];
-
-    for (final user in users) {
-      await _usersBox.put(user.userId, user);
+  // ─────────────────────────────────────────────
+  // RESTORE SESSION (Call this on app startup)
+  // ─────────────────────────────────────────────
+  Future<void> restoreSession() async {
+    final session = _usersBox.get('current_session');
+    if (session != null) {
+      _currentUser = session;
+      debugPrint('Restored active session for: ${session.email}');
     }
   }
 
   // ─────────────────────────────────────────────
   // REGISTER
   // ─────────────────────────────────────────────
-
-  /// Mendaftarkan user baru ke Supabase dan menyimpannya di Hive lokal.
-  ///
-  /// Return: [CachedUser] jika berhasil, null jika gagal.
-  /// Throw: [RegisterException] dengan pesan yang bisa ditampilkan ke UI.
   Future<CachedUser?> register({
     required String name,
     required String email,
@@ -61,25 +37,14 @@ class AuthController {
     final normalizedEmail = email.trim().toLowerCase();
     final normalizedPassword = password.trim();
 
-    // Validasi dasar
-    if (normalizedName.isEmpty ||
-        normalizedEmail.isEmpty ||
-        normalizedPassword.isEmpty) {
+    if (normalizedName.isEmpty || normalizedEmail.isEmpty || normalizedPassword.isEmpty) {
       throw RegisterException('Semua field harus diisi.');
-    }
-
-    // Cek apakah email sudah ada di lokal
-    final existingLocal = _usersBox.values.any(
-      (u) => u.email.toLowerCase() == normalizedEmail,
-    );
-    if (existingLocal) {
-      throw RegisterException('Email sudah terdaftar.');
     }
 
     try {
       final supabase = Supabase.instance.client;
 
-      // Cek apakah email sudah ada di Supabase
+      // Cek apakah email sudah ada di server Supabase
       final existing = await supabase
           .from('users')
           .select('user_id')
@@ -96,7 +61,7 @@ class AuthController {
           .insert({
             'name': normalizedName,
             'email': normalizedEmail,
-            'password_hash': normalizedPassword, // plaintext untuk sementara
+            'password_hash': normalizedPassword, // plaintext sementara
             'role': UserRole.reader.name,
           })
           .select('user_id')
@@ -105,7 +70,6 @@ class AuthController {
       final supabaseUserId = insertResponse['user_id'] as String;
       debugPrint('User registered in Supabase: $supabaseUserId');
 
-      // Simpan ke Hive lokal
       final newUser = CachedUser(
         userId: supabaseUserId,
         name: normalizedName,
@@ -114,7 +78,9 @@ class AuthController {
         avatarUrl: '',
       );
 
-      await _usersBox.put(supabaseUserId, newUser);
+      // Wipe any old local data and save ONLY the new active session
+      await _usersBox.clear();
+      await _usersBox.put('current_session', newUser);
       _currentUser = newUser;
 
       return newUser;
@@ -122,102 +88,82 @@ class AuthController {
       rethrow;
     } catch (e) {
       debugPrint('Register error: $e');
-      throw RegisterException(
-        'Registrasi gagal. Periksa koneksi internet kamu.',
-      );
+      throw RegisterException('Registrasi gagal. Periksa koneksi internet kamu.');
     }
   }
 
   // ─────────────────────────────────────────────
   // LOGIN
   // ─────────────────────────────────────────────
-
-  Future<CachedUser?> login(String input, String password) async {
-    final normalizedInput = input.trim().toLowerCase();
+  Future<CachedUser?> login(String email, String password) async {
+    final normalizedEmail = email.trim().toLowerCase();
     final normalizedPassword = password.trim();
 
-    if (normalizedInput.isEmpty || normalizedPassword.isEmpty) {
+    if (normalizedEmail.isEmpty || normalizedPassword.isEmpty) {
       return null;
     }
 
-    // Cari user di lokal berdasarkan email, nama, atau role
-    CachedUser? matchedUser;
-    try {
-      matchedUser = _usersBox.values.firstWhere(
-        (user) =>
-            user.email.toLowerCase() == normalizedInput ||
-            user.name.toLowerCase() == normalizedInput ||
-            user.role.name.toLowerCase() == normalizedInput,
-      );
-    } catch (_) {
-      return null; // Tidak ditemukan
-    }
-
-    // Validasi password: cek ke Supabase dulu, fallback ke 'password123'
     try {
       final supabase = Supabase.instance.client;
 
+      // Strictly ask Supabase for the user data
       final response = await supabase
           .from('users')
           .select('user_id, name, email, role, password_hash')
-          .eq('email', matchedUser.email)
+          .eq('email', normalizedEmail)
           .maybeSingle();
 
       if (response == null) {
-        // User ada di lokal tapi belum sync ke Supabase,
-        // gunakan password legacy
-        if (normalizedPassword != 'password123') return null;
-      } else {
-        // Bandingkan password_hash (plaintext untuk sementara)
-        final storedPassword = response['password_hash'] as String? ?? '';
-        if (normalizedPassword != storedPassword &&
-            normalizedPassword != 'password123') {
-          return null;
-        }
-
-        final supabaseUserId = response['user_id'] as String;
-
-        // Perbarui cache lokal dengan data terbaru dari Supabase
-        final updatedUser = CachedUser(
-          userId: supabaseUserId,
-          name: response['name'] as String,
-          email: response['email'] as String,
-          role: UserRole.values.firstWhere(
-            (r) => r.name == response['role'],
-            orElse: () => UserRole.reader,
-          ),
-          avatarUrl: matchedUser.avatarUrl,
-        );
-
-        await _usersBox.put(supabaseUserId, updatedUser);
-        _currentUser = updatedUser;
-        return updatedUser;
+        debugPrint('User tidak ditemukan di database.');
+        return null; 
       }
-    } catch (e) {
-      debugPrint('Supabase login check failed: $e. Falling back to local.');
-      // Fallback: gunakan password legacy
-      if (normalizedPassword != 'password123') return null;
-    }
 
-    _currentUser = matchedUser;
-    return matchedUser;
+      // Validate the password
+      final storedPassword = response['password_hash'] as String? ?? '';
+      if (normalizedPassword != storedPassword) {
+        debugPrint('Password salah.');
+        return null;
+      }
+
+      final loggedInUser = CachedUser(
+        userId: response['user_id'] as String,
+        name: response['name'] as String,
+        email: response['email'] as String,
+        role: UserRole.values.firstWhere(
+          (r) => r.name == response['role'],
+          orElse: () => UserRole.reader,
+        ),
+        avatarUrl: '', 
+      );
+
+      // Wipe the local database and save ONLY the current session
+      await _usersBox.clear();
+      await _usersBox.put('current_session', loggedInUser);
+      _currentUser = loggedInUser;
+
+      return loggedInUser;
+    } catch (e) {
+      debugPrint('Supabase login failed: $e');
+      // No offline fallback! If internet fails, deny entry.
+      return null;
+    }
   }
 
   // ─────────────────────────────────────────────
   // LOGOUT
   // ─────────────────────────────────────────────
-
-  CachedUser? logout() {
+  Future<void> logout() async {
     final previousUser = _currentUser;
+    // Completely destroy the local session
+    await _usersBox.clear(); 
     _currentUser = null;
-    return previousUser;
+    debugPrint('User logged out: ${previousUser?.email}');
   }
 }
 
 // ─────────────────────────────────────────────
 // EXCEPTION
 // ─────────────────────────────────────────────
-
 class RegisterException implements Exception {
   RegisterException(this.message);
   final String message;

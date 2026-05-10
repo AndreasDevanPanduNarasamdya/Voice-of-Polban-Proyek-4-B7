@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-// screens/debug_dashboard.dart removed from imports (unused)
+import 'dart:async';
+import 'package:voice_of_polban/controller/post_controller.dart';
 import 'package:voice_of_polban/auth/auth_view.dart';
 import 'models/hive_setup.dart';
 
+Timer? _backgroundSyncTimer;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -15,11 +17,25 @@ Future<void> main() async {
     anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
 
-  // Ensure Hive is initialized and all required boxes are opened before runApp
   await Hive.initFlutter();
-
-  // Register adapters and open the canonical boxes (also safe if called twice)
   await setupHive();
+
+// ── START OF NEW BACKGROUND SYNC ENGINE ──
+  final postController = PostController();
+  
+  // Run it once immediately on startup
+  postController.processSyncQueue();
+  postController.fetchFeed();
+  postController.fetchPendingPosts(); // <-- Add this here!
+
+  // Then loop it every 2 minutes
+  _backgroundSyncTimer = Timer.periodic(const Duration(minutes: 2), (timer) async {
+    debugPrint('Executing 2-minute background sync loop...');
+    await postController.processSyncQueue();    // Uploads offline work
+    await postController.fetchFeed();           // Downloads newest 8 for Readers
+    await postController.fetchPendingPosts();   // Downloads pending for Editors! <-- Add this here!
+  });
+  // ── END OF BACKGROUND ENGINE ──
 
   runApp(const VoiceOfPolbanApp());
 }
