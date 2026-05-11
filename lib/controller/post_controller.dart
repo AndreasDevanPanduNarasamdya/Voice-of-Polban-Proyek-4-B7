@@ -300,11 +300,15 @@ class PostController {
     }
   }
 
-  Future<bool> rejectPost(String postId) async {
+// Replace your existing rejectPost method with this one
+  Future<bool> rejectPost(String postId, {String note = ''}) async {
     try {
       await Supabase.instance.client
           .from('posts')
-          .update({'status': PostStatus.rejected.name})
+          .update({
+            'status': PostStatus.rejected.name,
+            'rejection_note': note // Assuming you add this column to Supabase
+          })
           .eq('post_id', postId);
 
       final cachedPost = _cachedPostsBox.get(postId);
@@ -313,6 +317,8 @@ class PostController {
           jsonDecode(cachedPost.cachedData) as Map,
         );
         data['status'] = PostStatus.rejected.name;
+        data['rejection_note'] = note;
+        
         cachedPost.cachedData = jsonEncode(data);
         cachedPost.cachedAt = DateTime.now();
         await _cachedPostsBox.put(postId, cachedPost);
@@ -324,6 +330,96 @@ class PostController {
       return false;
     }
   }
+
+  Future<bool> deleteArticle(String id) async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      // 1. Attempt to delete from Supabase
+      await supabase.from('posts').delete().eq('post_id', id);
+      
+      // 2. Remove from Local Cache
+      if (_cachedPostsBox.containsKey(id)) {
+        await _cachedPostsBox.delete(id);
+      }
+      
+      // 3. Remove from Local Drafts
+      if (_draftBox.containsKey(id)) {
+        await _draftBox.delete(id);
+      }
+      
+      return true;
+    } catch (e) {
+      debugPrint('Failed to delete article online: $e. Falling back to local offline delete.');
+      
+      // Fallback: Delete locally and queue the action
+      if (_cachedPostsBox.containsKey(id)) {
+        await _cachedPostsBox.delete(id);
+      }
+      if (_draftBox.containsKey(id)) {
+        await _draftBox.delete(id);
+      }
+      
+      final queueEntry = SyncQueue(
+        queueId: _uuid.v4(),
+        actionType: 'DELETE_POST',
+        payload: jsonEncode({'postId': id}),
+        isProcessed: false,
+        createdAt: DateTime.now(),
+      );
+      
+      await _queueBox.put(queueEntry.queueId, queueEntry);
+      return false;
+    }
+  }
+
+  Future<LocalDraft?> updateDraft(
+    String localId, 
+    String newTitle, 
+    String newContent
+  ) async {
+    final draft = _draftBox.get(localId);
+    if (draft == null) return null;
+
+    final trimmedTitle = newTitle.trim().isNotEmpty ? newTitle.trim() : draft.title;
+    final trimmedContent = newContent.trim().isNotEmpty ? newContent.trim() : draft.content;
+
+    // Update local state
+    draft.title = trimmedTitle;
+    draft.content = trimmedContent;
+    draft.updatedAt = DateTime.now();
+    await _draftBox.put(localId, draft);
+
+    // Sync to Supabase
+    try {
+      await Supabase.instance.client
+          .from('posts')
+          .update({
+            'title': draft.title,
+            'content': draft.content,
+          })
+          .eq('post_id', draft.postId);
+    } catch (e) {
+      debugPrint('Supabase update failed: $e. Queuing update.');
+      
+      final queueEntry = SyncQueue(
+        queueId: _uuid.v4(),
+        actionType: 'UPDATE_DRAFT',
+        payload: jsonEncode({
+          'postId': draft.postId,
+          'title': draft.title,
+          'content': draft.content,
+        }),
+        isProcessed: false,
+        createdAt: DateTime.now(),
+      );
+      await _queueBox.put(queueEntry.queueId, queueEntry);
+    }
+
+    return draft;
+  }
+
+
 
   int get pendingQueueLength =>
       _queueBox.values.where((entry) => !entry.isProcessed).length;

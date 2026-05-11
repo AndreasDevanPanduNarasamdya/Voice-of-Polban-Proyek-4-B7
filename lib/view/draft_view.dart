@@ -3,9 +3,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/app_enums.dart';
 import '../models/cached_post.dart';
 import '../models/cached_user.dart';
+import '../models/local_draft.dart';
 import '../auth/auth_controller.dart';
 import '../controller/post_controller.dart';
 import 'writer_view.dart';
+import 'dart:convert';
 
 class DraftPage extends StatefulWidget {
   const DraftPage({super.key});
@@ -25,21 +27,25 @@ class _DraftPageState extends State<DraftPage> {
   @override
   void initState() {
     super.initState();
-    _articleController = PostController(PostController: _AuthController);
+    _articleController = PostController();
   }
 
-  List<ArticleModel> _getMyArticles() {
-    final currentUserId = _AuthController.getCurrentUserId();
+  List<LocalDraft> _getMyArticles() {
+    // Use the actual property: currentUser?.userId
+    final currentUserId = _AuthController.currentUser?.userId; 
     if (currentUserId == null) return [];
-    final box = Hive.box<ArticleModel>('article_box');
+
+    // Use the actual box name defined in PostController: 'cached_post_box'
+    final box = Hive.box<LocalDraft>('local_draft_box'); 
+    
     return box.values
-        .where((a) => a.authorId == currentUserId)
-        .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            .where((a) => a.userId == currentUserId)
+            .toList()
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)); // Use updatedAt
   }
 
   String _getAuthorName(String authorId) {
-    final box = Hive.box<UserModel>('user_box');
+    final box = Hive.box<CachedUser>('cached_user_box'); // Box is 'cached_user_box'
     return box.get(authorId)?.name ?? 'Penulis';
   }
 
@@ -87,8 +93,8 @@ class _DraftPageState extends State<DraftPage> {
         ],
       ),
       body: ValueListenableBuilder(
-        valueListenable: Hive.box<CachedPost>('article_box').listenable(),
-        builder: (context, Box<CachedPost> box, _) {
+        valueListenable: Hive.box<LocalDraft>('local_draft_box').listenable(),
+        builder: (context, Box<LocalDraft> box, _) {
           final articles = _getMyArticles();
           if (articles.isEmpty) {
             return const Center(
@@ -103,15 +109,19 @@ class _DraftPageState extends State<DraftPage> {
               ),
             );
           }
-          return ListView.builder(
+              return ListView.builder(
             padding: const EdgeInsets.only(top: 4, bottom: 24),
             itemCount: articles.length,
-            itemBuilder: (ctx, i) => _DraftCard(
-              article: articles[i],
-              authorName: _getAuthorName(articles[i].authorId),
-              dateStr: _formatDate(articles[i].createdAt),
+            itemBuilder: (ctx, i) {
+              final draft = articles[i]; // 1. Use a semicolon here
+              
+              return _DraftCard(         // 2. You MUST return the widget
+                article: draft,// Missing 'final'
+              authorName: _getAuthorName(draft.userId), // Floating parameter, no widget!
+              dateStr: _formatDate(draft.updatedAt),    // Used semicolons instead of commas
               controller: _articleController,
-            ),
+              );                         // 4. Semicolon to end the return statement
+            },
           );
         },
       ),
@@ -121,7 +131,7 @@ class _DraftPageState extends State<DraftPage> {
 
 // ── Card sebagai StatefulWidget agar tiap card punya state expand sendiri ──
 class _DraftCard extends StatefulWidget {
-  final CachedPost article;
+  final LocalDraft article;
   final String authorName;
   final String dateStr;
   final PostController controller;
@@ -229,7 +239,7 @@ class _DraftCardState extends State<_DraftCard> {
           ),
 
           // ── Komentar penolakan (hanya jika rejected) ──
-          if (article.status == ArticleStatus.rejected &&
+          if (article.status == PostStatus.rejected &&
               article.rejectionNote != null &&
               article.rejectionNote!.isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -264,10 +274,10 @@ class _DraftCardState extends State<_DraftCard> {
     );
   }
 
-  Widget _buildStatusRow(ArticleModel article) {
+  Widget _buildStatusRow(LocalDraft article) {
     switch (article.status) {
       // Ditolak: Edit + Drop (kiri), chip Ditolak (kanan)
-      case ArticleStatus.rejected:
+      case PostStatus.rejected:
         return Row(
           children: [
             _actionBtn(
@@ -284,7 +294,7 @@ class _DraftCardState extends State<_DraftCard> {
               label: 'Drop',
               color: _redColor,
               bgColor: const Color(0xFF333333),
-              onTap: () => widget.controller.deleteArticle(article.articleId),
+              onTap: () => widget.controller.deleteArticle(article.postId),
             ),
             const Spacer(),
             _statusChip(
@@ -294,7 +304,7 @@ class _DraftCardState extends State<_DraftCard> {
         );
 
       // Terpublikasi: upvote count (kiri), chip hijau (kanan)
-      case ArticleStatus.published:
+      case PostStatus.published:
         return Row(
           children: [
             Container(
@@ -324,7 +334,7 @@ class _DraftCardState extends State<_DraftCard> {
         );
 
       // Dihapus/Archived: chip merah (kanan saja)
-      case ArticleStatus.archived:
+      case PostStatus.archived:
         return Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
@@ -335,7 +345,7 @@ class _DraftCardState extends State<_DraftCard> {
         );
 
       // Menunggu review: chip orange (kanan saja)
-      case ArticleStatus.pending:
+      case PostStatus.pending:
         return Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
@@ -348,7 +358,7 @@ class _DraftCardState extends State<_DraftCard> {
         );
 
       // Draft: Edit + Hapus (kiri), chip abu (kanan)
-      case ArticleStatus.draft:
+      case PostStatus.draft:
       default:
         return Row(
           children: [
@@ -366,7 +376,7 @@ class _DraftCardState extends State<_DraftCard> {
               label: 'Hapus',
               color: _redColor,
               bgColor: const Color(0xFF333333),
-              onTap: () => widget.controller.deleteArticle(article.articleId),
+              onTap: () => widget.controller.deleteArticle(article.localId),
             ),
             const Spacer(),
             _statusChip(

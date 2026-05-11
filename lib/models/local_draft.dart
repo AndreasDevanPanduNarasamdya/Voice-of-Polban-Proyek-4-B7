@@ -14,6 +14,7 @@ class LocalDraft {
     required this.content,
     required this.status,
     required this.updatedAt,
+    this.rejectionNote,
   });
 
   @HiveField(0)
@@ -36,4 +37,7 @@ class LocalDraft {
 
   @HiveField(6)
   DateTime updatedAt;
+
+  @HiveField(7)
+  String? rejectionNote;
 }
