@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/app_enums.dart';
-import '../models/article_model.dart';
-import '../models/user_model.dart';
-import '../auth/auth_service.dart';
-import '../controller/article_controller.dart';
+import '../models/cached_post.dart';
+import '../models/cached_user.dart';
+import '../auth/auth_controller.dart';
+import '../controller/post_controller.dart';
 import 'writer_view.dart';
 
 class DraftPage extends StatefulWidget {
@@ -19,17 +19,17 @@ class _DraftPageState extends State<DraftPage> {
   static const Color _orangeColor = Color(0xFFFF6D00);
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  final AuthService _authService = AuthService();
-  late final ArticleController _articleController;
+  final AuthController _AuthController = AuthController();
+  late final PostController _articleController;
 
   @override
   void initState() {
     super.initState();
-    _articleController = ArticleController(authService: _authService);
+    _articleController = PostController(PostController: _AuthController);
   }
 
   List<ArticleModel> _getMyArticles() {
-    final currentUserId = _authService.getCurrentUserId();
+    final currentUserId = _AuthController.getCurrentUserId();
     if (currentUserId == null) return [];
     final box = Hive.box<ArticleModel>('article_box');
     return box.values
@@ -87,8 +87,8 @@ class _DraftPageState extends State<DraftPage> {
         ],
       ),
       body: ValueListenableBuilder(
-        valueListenable: Hive.box<ArticleModel>('article_box').listenable(),
-        builder: (context, Box<ArticleModel> box, _) {
+        valueListenable: Hive.box<CachedPost>('article_box').listenable(),
+        builder: (context, Box<CachedPost> box, _) {
           final articles = _getMyArticles();
           if (articles.isEmpty) {
             return const Center(
@@ -121,10 +121,10 @@ class _DraftPageState extends State<DraftPage> {
 
 // ── Card sebagai StatefulWidget agar tiap card punya state expand sendiri ──
 class _DraftCard extends StatefulWidget {
-  final ArticleModel article;
+  final CachedPost article;
   final String authorName;
   final String dateStr;
-  final ArticleController controller;
+  final PostController controller;
 
   const _DraftCard({
     required this.article,

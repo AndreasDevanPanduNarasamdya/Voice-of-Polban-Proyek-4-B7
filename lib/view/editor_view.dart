@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../models/article_model.dart';
-import '../models/user_model.dart';
+import 'package:voice_of_polban/auth/auth_controller.dart';
+import 'package:voice_of_polban/models/cached_post.dart';
+import 'package:voice_of_polban/models/cached_user.dart';
+import '../models/cached_post.dart';
+import '../models/cached_user.dart';
 import '../models/app_enums.dart';
-import '../controller/article_controller.dart';
+import '../controller/Post_controller.dart';
 import '../auth/auth_service.dart';
-import 'article_view.dart';
+import 'Post_view.dart';
 
 class EditorPage extends StatefulWidget {
   const EditorPage({super.key});
@@ -15,25 +18,25 @@ class EditorPage extends StatefulWidget {
 }
 
 class _EditorPageState extends State<EditorPage> {
-  final AuthService _authService = AuthService();
-  late final ArticleController _controller;
+  final AuthController _AuthController =AuthController();
+  late final PostController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = ArticleController(authService: _authService);
+    _controller = PostController(AuthController: _AuthController);
   }
 
   // Helper to resolve Foreign Key (authorId) to Real Name
   String _getAuthorName(String authorId) {
-    final user = Hive.box<UserModel>('user_box').get(authorId);
+    final user = Hive.box<CachedUser>('user_box').get(authorId);
     return user?.name ?? "Penulis Tidak Diketahui";
   }
 
   // The Review Dialog to enforce your Anti-Mass-Approval rule
   void _showReviewDialog(
     BuildContext context,
-    ArticleModel article,
+    CachedPost Post,
     bool isApprove,
   ) {
     final TextEditingController noteController = TextEditingController();
@@ -98,8 +101,8 @@ class _EditorPageState extends State<EditorPage> {
                   ),
                   onPressed: () {
                     // Call the controller method
-                    final error = _controller.reviewArticle(
-                      articleId: article.articleId,
+                    final error = _controller.reviewPost(
+                      PostId: Post.postId,
                       approved: isApprove,
                       note: noteController.text,
                     );
@@ -112,7 +115,7 @@ class _EditorPageState extends State<EditorPage> {
                     } else {
                       // If approved, automatically publish it to the feed
                       if (isApprove) {
-                        _controller.publishArticle(article.articleId);
+                        _controller.publishPost(Post.PostId);
                       }
                       Navigator.pop(context); // Close dialog
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -143,8 +146,8 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   // Handles the "Drop" (Delete) action
-  void _dropArticle(ArticleModel article) {
-    Hive.box<ArticleModel>('article_box').delete(article.articleId);
+  void _dropPost(CachedPost Post) {
+    Hive.box<CachedPost>('Post_box').delete(Post.PostId);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text("Artikel di-drop (dihapus)."),
@@ -195,17 +198,17 @@ class _EditorPageState extends State<EditorPage> {
           ),
         ],
       ),
-      body: ValueListenableBuilder<Box<ArticleModel>>(
-        valueListenable: Hive.box<ArticleModel>('article_box').listenable(),
+      body: ValueListenableBuilder<Box<CachedPost>>(
+        valueListenable: Hive.box<CachedPost>('Post_box').listenable(),
         builder: (context, box, _) {
-          final pendingArticles = box.values
+          final pendingPosts = box.values
               .where((a) =>
-                  a.status == ArticleStatus.draft ||
-                  a.status == ArticleStatus.pending)
+                  a.status == PostStatus.draft ||
+                  a.status == PostStatus.pending)
               .toList()
             ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-          if (pendingArticles.isEmpty) {
+          if (pendingPosts.isEmpty) {
             return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -221,18 +224,18 @@ class _EditorPageState extends State<EditorPage> {
 
           return ListView.builder(
             padding: const EdgeInsets.only(top: 8, bottom: 24),
-            itemCount: pendingArticles.length,
+            itemCount: pendingPosts.length,
             itemBuilder: (context, index) =>
-                _buildEditorCard(context, pendingArticles[index]),
+                _buildEditorCard(context, pendingPosts[index]),
           );
         },
       ),
     );
   }
 
-  Widget _buildEditorCard(BuildContext context, ArticleModel article) {
-    final authorName = _getAuthorName(article.authorId);
-    final dateStr = _formatDate(article.createdAt);
+  Widget _buildEditorCard(BuildContext context, CachedPost Post) {
+    final authorName = _getAuthorName(Post.authorId);
+    final dateStr = _formatDate(Post.createdAt);
 
     return Container(
       decoration: const BoxDecoration(
@@ -273,7 +276,7 @@ class _EditorPageState extends State<EditorPage> {
 
           // Judul artikel
           Text(
-            article.title,
+            Post.title,
             style: const TextStyle(
                 color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
           ),
@@ -286,7 +289,7 @@ class _EditorPageState extends State<EditorPage> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                  builder: (_) => ArticlePage(articleId: article.articleId)),
+                  builder: (_) => PostPage(PostId: Post.PostId)),
             ),
             child: Container(
               height: 160,
@@ -312,21 +315,21 @@ class _EditorPageState extends State<EditorPage> {
                 icon: Icons.check,
                 color: Colors.green,
                 label: 'Publikasi',
-                onTap: () => _showReviewDialog(context, article, true),
+                onTap: () => _showReviewDialog(context, Post, true),
               ),
               const SizedBox(width: 8),
               _buildActionButton(
                 icon: Icons.close,
                 color: Colors.red,
                 label: 'Tolak',
-                onTap: () => _showReviewDialog(context, article, false),
+                onTap: () => _showReviewDialog(context, Post, false),
               ),
               const SizedBox(width: 8),
               _buildActionButton(
                 icon: Icons.delete_outline,
                 color: Colors.red,
                 label: 'Drop',
-                onTap: () => _dropArticle(article),
+                onTap: () => _dropPost(Post),
               ),
             ],
           ),
