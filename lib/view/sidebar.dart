@@ -17,6 +17,9 @@ class AppSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final auth = AuthController();
+    final userName = auth.currentUser?.name ?? 'Pengguna';
+
     return Drawer(
       backgroundColor: _bg,
       child: Column(
@@ -31,7 +34,7 @@ class AppSidebar extends StatelessWidget {
               right: 16,
               bottom: 20,
             ),
-            child: const Row(
+            child: Row(
               children: [
                 CircleAvatar(
                   radius: 28,
@@ -43,7 +46,7 @@ class AppSidebar extends StatelessWidget {
                   children: [
                     Text('Selamat Datang,',
                         style: TextStyle(color: Colors.white60, fontSize: 13)),
-                    Text('James McGill',
+                    Text(userName,
                         style: TextStyle(
                             color: Colors.white,
                             fontSize: 17,
@@ -88,7 +91,7 @@ class AppSidebar extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (_) => SettingsPage(
-                  userName: 'User',
+                  userName: userName,
                   role: currentUserRole,
                 ),
               ),

@@ -64,7 +64,7 @@ class SettingsPage extends StatelessWidget {
             child: Row(
               children: [
                 CircleAvatar(
-                  radius: 28,
+                  radius: 32, // Slightly larger to match your mockup
                   backgroundColor: Colors.grey[700],
                   backgroundImage:
                       userImageUrl != null ? NetworkImage(userImageUrl!) : null,
@@ -72,17 +72,30 @@ class SettingsPage extends StatelessWidget {
                       ? const Icon(Icons.person, color: Colors.white70, size: 30)
                       : null,
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Selamat Datang,',
-                        style: TextStyle(color: Colors.white60, fontSize: 13)),
-                    Text(userName,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold)),
+                    Text(
+                      userName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      role == UserRole.writer 
+                          ? 'Penulis' 
+                          : role == UserRole.editor 
+                              ? 'Editor' 
+                              : 'Pembaca',
+                      style: const TextStyle(
+                        color: Colors.white70, 
+                        fontSize: 15,
+                      ),
+                    ),
                   ],
                 ),
               ],
