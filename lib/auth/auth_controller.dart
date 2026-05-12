@@ -9,10 +9,26 @@ import 'dart:convert';
 class AuthController {
   static const String _usersBoxName = 'cached_user_box';
 
+  // Singleton
+  static final AuthController _instance = AuthController._internal();
+  factory AuthController() => _instance;
+
+  AuthController._internal() {
+    _restoreSession(); // ← goes HERE, inside the private constructor
+  }
+
   CachedUser? _currentUser;
 
   Box<CachedUser> get _usersBox => Hive.box<CachedUser>(_usersBoxName);
   CachedUser? get currentUser => _currentUser;
+
+  void _restoreSession() {
+    final sessionBox = Hive.box('session_box');
+    final userId = sessionBox.get('logged_in_user_id');
+    if (userId != null) {
+      _currentUser = _usersBox.get(userId);
+    }
+  }
 
   String _hashPassword(String password) {
     final bytes = utf8.encode(password);
@@ -61,6 +77,7 @@ class AuthController {
 
       // Save session locally
       await _usersBox.put(cachedUser.userId, cachedUser);
+      await Hive.box('session_box').put('logged_in_user_id', cachedUser.userId);
       _currentUser = cachedUser;
 
       return cachedUser;
@@ -72,6 +89,7 @@ class AuthController {
         final localUser = _usersBox.values.firstWhere(
           (u) => u.email == normalizedInput || u.name == normalizedInput
         );
+        await Hive.box('session_box').put('logged_in_user_id', localUser.userId);
         _currentUser = localUser;
         return localUser;
       } catch (_) {
@@ -119,6 +137,7 @@ class AuthController {
       );
 
       await _usersBox.put(cachedUser.userId, cachedUser);
+      await Hive.box('session_box').put('logged_in_user_id', cachedUser.userId);
       _currentUser = cachedUser;
 
       return cachedUser;
@@ -129,6 +148,7 @@ class AuthController {
   }
 
   CachedUser? logout() {
+    Hive.box('session_box').delete('logged_in_user_id');
     final previousUser = _currentUser;
     _currentUser = null;
     return previousUser;

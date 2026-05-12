@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 // screens/debug_dashboard.dart removed from imports (unused)
 import 'package:voice_of_polban/auth/auth_view.dart';
+import 'package:voice_of_polban/auth/auth_controller.dart'; // Added this
+import 'package:voice_of_polban/view/home_view.dart'; // Added this
 import 'models/hive_setup.dart';
 
 Future<void> main() async {
@@ -47,7 +49,9 @@ class VoiceOfPolbanApp extends StatelessWidget {
         ),
       ),
 
-      home: const LoginView(),
+      home: AuthController().currentUser != null
+          ? const HomePage() 
+          : const LoginView(),
     );
   }
 }

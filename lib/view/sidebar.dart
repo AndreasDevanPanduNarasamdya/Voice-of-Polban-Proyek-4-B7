@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:voice_of_polban/view/writer_view.dart';
 import 'package:voice_of_polban/auth/auth_view.dart';
+import 'package:voice_of_polban/auth/auth_controller.dart';
 import 'package:voice_of_polban/view/editor_view.dart';
 import 'package:voice_of_polban/view/draft_view.dart';
 import 'package:voice_of_polban/view/settings_view.dart';
-import '../auth/auth_controller.dart';
 import '../models/app_enums.dart';
 
 class AppSidebar extends StatelessWidget {
@@ -69,6 +69,7 @@ class AppSidebar extends StatelessWidget {
             }),
 
           // ── Lihat Draft: writer → DraftPage, editor → EditorPage ──
+          if (currentUserRole == UserRole.writer || currentUserRole == UserRole.editor)
           _tile(context, Icons.inbox_outlined, 'Lihat Draft', onTap: () {
             Navigator.pop(context);
             if (currentUserRole == UserRole.editor) {
@@ -87,7 +88,7 @@ class AppSidebar extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (_) => SettingsPage(
-                  userName: 'James McGill',
+                  userName: 'User',
                   role: currentUserRole,
                 ),
               ),
