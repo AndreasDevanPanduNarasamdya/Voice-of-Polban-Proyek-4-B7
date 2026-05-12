@@ -8,7 +8,7 @@ import 'package:voice_of_polban/view/article_view.dart';
 import '../models/cached_post.dart';
 import '../models/cached_user.dart';
 import '../models/app_enums.dart';
-import '../controller/Post_controller.dart';
+import '../controller/post_controller.dart';
 import '../auth/auth_controller.dart';
 import 'dart:convert';
 import 'article_view.dart';
@@ -28,11 +28,12 @@ class _EditorPageState extends State<EditorPage> {
   void initState() {
     super.initState();
     _controller = PostController();
+    _controller.fetchPendingPosts();
   }
 
   // Helper to resolve Foreign Key (authorId) to Real Name
   String _getAuthorName(String authorId) {
-    final user = Hive.box<CachedUser>('user_box').get(authorId);
+    final user = Hive.box<CachedUser>('cached_user_box').get(authorId);
     return user?.name ?? "Penulis Tidak Diketahui";
   }
 
@@ -156,8 +157,8 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   // Handles the "Drop" (Delete) action
-  void _dropPost(CachedPost Post) {
-    Hive.box<CachedPost>('Post_box').delete(Post.postId);
+  void _dropPost(CachedPost post) {
+    Hive.box<CachedPost>('cached_post_box').delete(post.postId);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text("Artikel di-drop (dihapus)."),
@@ -209,7 +210,7 @@ class _EditorPageState extends State<EditorPage> {
         ],
       ),
       body: ValueListenableBuilder<Box<CachedPost>>(
-        valueListenable: Hive.box<CachedPost>('Post_box').listenable(),
+        valueListenable: Hive.box<CachedPost>('cached_post_box').listenable(),
         builder: (context, box, _) {
           final pendingPosts = box.values.where((p) {
             final data = jsonDecode(p.cachedData);

@@ -4,6 +4,7 @@ import 'package:voice_of_polban/auth/auth_view.dart';
 import 'package:voice_of_polban/view/editor_view.dart';
 import 'package:voice_of_polban/view/draft_view.dart';
 import 'package:voice_of_polban/view/settings_view.dart';
+import '../auth/auth_controller.dart';
 import '../models/app_enums.dart';
 
 class AppSidebar extends StatelessWidget {
@@ -99,13 +100,17 @@ class AppSidebar extends StatelessWidget {
           ),
 
           // ── Keluar ──
-          _tile(context, Icons.logout, 'Keluar', color: _red, onTap: () {
+          _tile(context, Icons.logout, 'Keluar', color: _red, onTap: () async {
             Navigator.pop(context);
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (_) => const LoginView()),
-              (route) => false,
-            );
+            final auth = AuthController();
+            await auth.logout();
+            if (context.mounted) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginView()),
+                (route) => false,
+              );
+            }
           }),
 
           const Spacer(),

@@ -46,6 +46,33 @@ class _LoginState extends State<LoginView> {
     }
   }
 
+  Future<void> _onRegisterPressed() async {
+    setState(() => _errorMessage = null);
+    if (!_formKey.currentState!.validate()) return;
+
+    // Calls the new register method in AuthController
+    final user = await _controller.register(
+      _inputController.text,
+      _passwordController.text,
+    );
+
+    if (user != null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pendaftaran berhasil!'), 
+          backgroundColor: Colors.green
+        ),
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+      );
+    } else {
+      setState(() => _errorMessage = 'Pendaftaran gagal (Mungkin sudah terdaftar)');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -157,15 +184,7 @@ class _LoginState extends State<LoginView> {
                 const SizedBox(height: 16),
 
                 ElevatedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Registration disabled. Use admin or Supabase.',
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: _onRegisterPressed,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF000080),
                     padding: const EdgeInsets.symmetric(vertical: 16),

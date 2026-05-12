@@ -286,7 +286,8 @@ class _DraftCardState extends State<_DraftCard> {
               color: Colors.white,
               bgColor: const Color(0xFF333333),
               onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const WriterPage())),
+                  MaterialPageRoute(
+                      builder: (_) => WriterPage(draftId: article.localId))),
             ),
             const SizedBox(width: 8),
             _actionBtn(
@@ -368,7 +369,7 @@ class _DraftCardState extends State<_DraftCard> {
               color: Colors.white,
               bgColor: const Color(0xFF333333),
               onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const WriterPage())),
+                MaterialPageRoute(builder: (_) => WriterPage(draftId: article.localId))),
             ),
             const SizedBox(width: 8),
             _actionBtn(

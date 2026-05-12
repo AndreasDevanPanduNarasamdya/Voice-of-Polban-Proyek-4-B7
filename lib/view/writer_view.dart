@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import '../auth/auth_controller.dart';
 import '../controller/post_controller.dart';
 import '../models/local_draft.dart';
 
 class WriterPage extends StatefulWidget {
-  const WriterPage({super.key});
+  final String? draftId; // Add this line
+  const WriterPage({super.key, this.draftId});
 
   @override
   State<WriterPage> createState() => _WriterPageState();
@@ -31,6 +33,20 @@ class _WriterPageState extends State<WriterPage> {
 
   String? _selectedSectionId;
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.draftId != null) {
+      // Load existing draft from local Hive box
+      _draft = Hive.box<LocalDraft>('local_draft_box').get(widget.draftId);
+      if (_draft != null) {
+        _titleController.text = _draft!.title;
+        _contentController.text = _draft!.content;
+        // Optional: you can also set the category if you save it in the model
+      }
+    }
+  }
+  
   @override
   void dispose() {
     _titleController.dispose();
@@ -67,16 +83,30 @@ class _WriterPageState extends State<WriterPage> {
 
     setState(() => _isSaving = true);
     try {
-      final savedDraft = await _postController.saveDraft(
-        title,
-        content,
-        userId,
-      );
+      LocalDraft? savedDraft;
+      
+      // LOGIC FIX: Check if we are updating an existing draft or creating a new one
+      if (_draft != null) {
+        savedDraft = await _postController.updateDraft(
+          _draft!.localId, 
+          title, 
+          content
+        );
+      } else {
+        savedDraft = await _postController.saveDraft(
+          title,
+          content,
+          userId,
+        );
+      }
+
       if (!mounted) return;
+      
       setState(() => _draft = savedDraft);
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Draf tersimpan dengan ID ${savedDraft.postId}.'),
+        const SnackBar(
+          content: Text('Draf tersimpan!'),
           backgroundColor: Colors.green,
         ),
       );

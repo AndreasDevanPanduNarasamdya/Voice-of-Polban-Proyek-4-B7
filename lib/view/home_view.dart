@@ -21,12 +21,19 @@ class _HomePageState extends State<HomePage> {
   final AuthController _authController = AuthController();
   final PostController _controller = PostController();
   int _selectedIndex = 0;
+  late Future<List<CachedPost>> _onlineFeed;
 
   @override
   void initState() {
     super.initState();
-    // Fetch latest feed on startup (updates local cache)
-    _controller.fetchFeed();
+    _onlineFeed = _controller.fetchFeed();
+    _controller.processSyncQueue();
+  }
+
+  Future<void> _refreshFeed() async {
+    setState(() {
+      _onlineFeed = _controller.fetchFeed();
+    });
   }
 
   String _getAuthorName(String authorId) {
@@ -62,12 +69,16 @@ class _HomePageState extends State<HomePage> {
           ),
 
           // 2. REACTIVE FEED: Listens to new articles/publications instantly
-          body: ValueListenableBuilder<Box<CachedPost>>(
-            valueListenable: Hive.box<CachedPost>(
-              'cached_post_box',
-            ).listenable(),
-            builder: (context, postsBox, _) {
-              final posts = _controller.getOfflinePosts();
+          body: FutureBuilder<List<CachedPost>>(
+            future: _onlineFeed,
+            builder: (context, snapshot) {
+              // Show a loading spinner while communicating with the database
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(color: Color(0xFFFF8C00)),
+                );
+              }
+              final posts = snapshot.data ?? [];
 
               if (posts.isEmpty) {
                 return const Center(
@@ -78,13 +89,19 @@ class _HomePageState extends State<HomePage> {
                 );
               }
 
-              return ListView.builder(
-                itemCount: posts.length,
-                itemBuilder: (context, index) {
-                  final post = posts[index];
-                  return _buildArticleCard(context, post);
+              return RefreshIndicator(
+                color: const Color(0xFFFF8C00),
+                backgroundColor: const Color(0xFF1E1E1E),
+                onRefresh: _refreshFeed, // Triggers the network call again
+                child: ListView.builder(
+                  // physics is required to ensure pull-to-refresh works even if the list is short
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: posts.length,
+                  itemBuilder: (context, index) {
+                    final post = posts[index];
+                    return _buildArticleCard(context, post);
                 },
-              );
+              ));
             },
           ),
 

@@ -425,4 +425,46 @@ class PostController {
       _queueBox.values.where((entry) => !entry.isProcessed).length;
 
   LocalDraft? getDraftById(String localId) => _draftBox.get(localId);
+
+  // --- THE SYNC WORKER ---
+  Future<void> processSyncQueue() async {
+    // 1. Find all items that haven't been pushed to the server yet
+    final pendingTasks = _queueBox.values.where((entry) => !entry.isProcessed).toList();
+    if (pendingTasks.isEmpty) return;
+
+    final supabase = Supabase.instance.client;
+
+    // 2. Process them one by one
+    for (final task in pendingTasks) {
+      try {
+        final payload = jsonDecode(task.payload);
+
+        if (task.actionType == 'UPLOAD_DRAFT') {
+          await supabase.from('posts').upsert({
+            'post_id': payload['postId'],
+            'title': payload['title'],
+            'content': payload['content'],
+            'author_id': payload['userId'],
+            'status': payload['status'],
+          });
+        } else if (task.actionType == 'UPDATE_DRAFT') {
+          await supabase.from('posts').update({
+            'title': payload['title'],
+            'content': payload['content'],
+          }).eq('post_id', payload['postId']);
+        } else if (task.actionType == 'DELETE_POST') {
+          await supabase.from('posts').delete().eq('post_id', payload['postId']);
+        }
+
+        // 3. If successful, mark as processed so we don't duplicate it!
+        task.isProcessed = true;
+        await _queueBox.put(task.queueId, task);
+        debugPrint('Successfully synced offline task: ${task.actionType}');
+        
+      } catch (e) {
+        debugPrint('Sync task failed (Still Offline?): $e');
+        // It failed, so we leave isProcessed as false. It will try again next time!
+      }
+    }
+  }
 }

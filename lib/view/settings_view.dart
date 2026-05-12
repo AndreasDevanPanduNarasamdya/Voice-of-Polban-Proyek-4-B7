@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/app_enums.dart';
+import '../auth/auth_controller.dart';
+import '../auth/auth_view.dart'; // To navigate back to login
 
 class SettingsPage extends StatelessWidget {
   final String userName;
@@ -116,7 +118,19 @@ class SettingsPage extends StatelessWidget {
                   title: 'Keluar',
                   msg: 'Apakah kamu yakin ingin keluar?',
                   btnLabel: 'Keluar',
-                  onOk: () => Navigator.popUntil(context, (r) => r.isFirst),
+                  onOk: () async {
+                    // LOGIC FIX: Actually wipe the session data!
+                    final auth = AuthController();
+                    await auth.logout(); 
+                    
+                    if (context.mounted) {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginView()),
+                        (route) => false,
+                      );
+                    }
+                  },
                 ), color: _red),
 
                 // Hapus akun hanya untuk writer
