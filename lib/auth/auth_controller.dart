@@ -81,31 +81,31 @@ class AuthController {
   }
 
   // 2. REAL REGISTRATION LOGIC
-  Future<CachedUser?> register(String input, String password) async {
-    final normalizedInput = input.trim();
+  Future<CachedUser?> register({
+    required String name, 
+    required String email, // Add this
+    required String password, 
+    UserRole role = UserRole.reader
+  }) async {
+    final normalizedName = name.trim();
+    final normalizedEmail = email.trim(); // Add this
     final normalizedPassword = password.trim();
     final hashedPassword = _hashPassword(normalizedPassword);
 
-    if (normalizedInput.isEmpty || normalizedPassword.isEmpty) {
+    if (normalizedName.isEmpty || normalizedEmail.isEmpty || normalizedPassword.isEmpty) {
       return null;
     }
 
     try {
       final supabase = Supabase.instance.client;
       
-      // Since UI only has 1 field for "Nama atau Email", we guess the email
-      final emailValue = normalizedInput.contains('@') 
-          ? normalizedInput 
-          : '$normalizedInput@polban.ac.id';
-
-      // Insert new user into the database. Defaults role to 'reader'
       final insertResponse = await supabase
           .from('users')
           .insert({
-            'name': normalizedInput,
-            'email': emailValue,
+            'name': normalizedName,
+            'email': normalizedEmail, // Use the real email
             'password_hash': hashedPassword,
-            'role': UserRole.reader.name,
+            'role': role.name,
           })
           .select('user_id, name, email, role')
           .single();
@@ -114,18 +114,17 @@ class AuthController {
         userId: insertResponse['user_id'].toString(),
         name: insertResponse['name'].toString(),
         email: insertResponse['email'].toString(),
-        role: UserRole.reader,
+        role: role,
         avatarUrl: '',
       );
 
-      // Save session locally
       await _usersBox.put(cachedUser.userId, cachedUser);
       _currentUser = cachedUser;
 
       return cachedUser;
     } catch (e) {
       debugPrint('Supabase registration failed: $e');
-      return null; // Usually fails if email/name already exists
+      return null; 
     }
   }
 
