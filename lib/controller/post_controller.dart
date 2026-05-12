@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
@@ -26,6 +27,7 @@ class PostController {
     String? title,
     String? content,
     String userId,
+    {List<String>? imageUrls}
   ) async {
     final trimmedTitle = (title?.trim().isNotEmpty ?? false)
         ? title!.trim()
@@ -64,6 +66,7 @@ class PostController {
         content: trimmedContent,
         status: PostStatus.draft,
         updatedAt: DateTime.now(),
+        imageUrls: imageUrls,
       );
 
       await _draftBox.put(draft.localId, draft);
@@ -81,6 +84,7 @@ class PostController {
         content: trimmedContent,
         status: PostStatus.draft,
         updatedAt: DateTime.now(),
+        imageUrls: imageUrls,
       );
 
       await _draftBox.put(draft.localId, draft);
@@ -88,11 +92,41 @@ class PostController {
     }
   }
 
+  Future<List<String>> _uploadImages(List<String>? paths, String postId) async {
+    if (paths == null || paths.isEmpty) return [];
+    
+    final supabase = Supabase.instance.client;
+    List<String> uploadedUrls = [];
+
+    for (int i = 0; i < paths.length; i++) {
+      final path = paths[i];
+      if (path.startsWith('http')) {
+        uploadedUrls.add(path);
+        continue;
+      }
+      try {
+        final file = File(path);
+        final fileExt = path.split('.').last;
+        final fileName = '${postId}_${DateTime.now().millisecondsSinceEpoch}_$i.$fileExt';
+        
+        await supabase.storage.from('post_images').upload(fileName, file);
+        final publicUrl = supabase.storage.from('post_images').getPublicUrl(fileName);
+        uploadedUrls.add(publicUrl);
+      } catch (e) {
+        debugPrint('Failed to upload image $path: $e');
+      }
+    }
+    return uploadedUrls;
+  }
+
   Future<SyncQueue?> submitDraft(String localId) async {
     final draft = _draftBox.get(localId);
     if (draft == null) {
       return null;
     }
+
+    final finalUrls = await _uploadImages(draft.imageUrls, draft.postId);
+    draft.imageUrls = finalUrls;
 
     final supabase = Supabase.instance.client;
 
@@ -127,6 +161,31 @@ class PostController {
             .single();
       }
 
+      // ADDED THIS: The relational attachments logic
+      if (finalUrls.isNotEmpty) {
+        final existingAttachment = await supabase.from('attachments').select('attachment_id').eq('post_id', draft.postId).maybeSingle();
+        String attachmentId;
+        
+        if (existingAttachment != null) {
+          attachmentId = existingAttachment['attachment_id'];
+          await supabase.from('attachment_details').delete().eq('attachment_id', attachmentId);
+        } else {
+          final newAttachment = await supabase.from('attachments').insert({
+            'type': 'image',
+            'post_id': draft.postId,
+          }).select('attachment_id').single();
+          attachmentId = newAttachment['attachment_id'];
+        }
+
+        final attachmentDetailsRows = finalUrls.asMap().entries.map((entry) => {
+          'attachment_id': attachmentId,
+          'attachment_order': entry.key,
+          'file_path': entry.value,
+        }).toList();
+
+        await supabase.from('attachment_details').insert(attachmentDetailsRows);
+      }
+
       // Update local draft status
       draft.status = PostStatus.pending;
       draft.updatedAt = DateTime.now();
@@ -143,6 +202,7 @@ class PostController {
           'title': draft.title,
           'content': draft.content,
           'status': draft.status.name,
+          'imageUrls': finalUrls,
           'updatedAt': draft.updatedAt.toIso8601String(),
         }),
         isProcessed: false,
@@ -171,6 +231,7 @@ class PostController {
           'title': draft.title,
           'content': draft.content,
           'status': draft.status.name,
+          'imageUrls': draft.imageUrls,
           'updatedAt': draft.updatedAt.toIso8601String(),
         }),
         isProcessed: false,
@@ -376,17 +437,18 @@ class PostController {
   Future<LocalDraft?> updateDraft(
     String localId, 
     String newTitle, 
-    String newContent
+    String newContent,
+    {List<String>? imageUrls}
   ) async {
     final draft = _draftBox.get(localId);
     if (draft == null) return null;
 
     final trimmedTitle = newTitle.trim().isNotEmpty ? newTitle.trim() : draft.title;
     final trimmedContent = newContent.trim().isNotEmpty ? newContent.trim() : draft.content;
-
-    // Update local state
+    
     draft.title = trimmedTitle;
     draft.content = trimmedContent;
+    draft.imageUrls = imageUrls;
     draft.updatedAt = DateTime.now();
     await _draftBox.put(localId, draft);
 
@@ -409,6 +471,7 @@ class PostController {
           'postId': draft.postId,
           'title': draft.title,
           'content': draft.content,
+          'imageUrls': draft.imageUrls,
         }),
         isProcessed: false,
         createdAt: DateTime.now(),

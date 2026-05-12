@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
 import '../auth/auth_controller.dart';
 import '../controller/post_controller.dart';
@@ -16,6 +18,8 @@ class WriterPage extends StatefulWidget {
 class _WriterPageState extends State<WriterPage> {
   final AuthController _authController = AuthController();
   final PostController _postController = PostController();
+  final ImagePicker _picker = ImagePicker();
+  List<String> _selectedImages = [];
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
@@ -42,7 +46,9 @@ class _WriterPageState extends State<WriterPage> {
       if (_draft != null) {
         _titleController.text = _draft!.title;
         _contentController.text = _draft!.content;
-        // Optional: you can also set the category if you save it in the model
+        if (_draft!.imageUrls != null) {
+          _selectedImages = List<String>.from(_draft!.imageUrls!); // Load offline images
+        }
       }
     }
   }
@@ -55,6 +61,31 @@ class _WriterPageState extends State<WriterPage> {
   }
 
   String? get _currentUserId => _authController.currentUser?.userId;
+
+  Future<void> _pickImages() async {
+    if (_selectedImages.length >= 8) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maksimal 8 gambar!')));
+      return;
+    }
+    try {
+      final List<XFile> images = await _picker.pickMultiImage();
+      if (images.isNotEmpty) {
+        setState(() {
+          for (var img in images) {
+            if (_selectedImages.length < 8 && !_selectedImages.contains(img.path)) {
+              _selectedImages.add(img.path);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() => _selectedImages.removeAt(index));
+  }
 
   Future<void> _saveDraft() async {
     final title = _titleController.text.trim();
@@ -88,15 +119,11 @@ class _WriterPageState extends State<WriterPage> {
       // LOGIC FIX: Check if we are updating an existing draft or creating a new one
       if (_draft != null) {
         savedDraft = await _postController.updateDraft(
-          _draft!.localId, 
-          title, 
-          content
+          _draft!.localId, title, content, imageUrls: _selectedImages,
         );
       } else {
         savedDraft = await _postController.saveDraft(
-          title,
-          content,
-          userId,
+          title, content, userId, imageUrls: _selectedImages,
         );
       }
 
@@ -231,49 +258,61 @@ class _WriterPageState extends State<WriterPage> {
               ),
               const SizedBox(height: 16),
               Container(
-                height: 180,
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
+                decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(12)),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Tambah Gambar Depan',
-                      style: TextStyle(color: Colors.grey, fontSize: 16),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(
-                            Icons.insert_drive_file_outlined,
-                            size: 12,
-                            color: Colors.black,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Gambar (${_selectedImages.length}/8)', style: const TextStyle(color: Colors.grey, fontSize: 16)),
+                        InkWell(
+                          onTap: _pickImages,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(8)),
+                            child: const Text('Tambah', style: TextStyle(color: Color(0xFFFF8C00))),
                           ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Tambah Gambar',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
+                    if (_selectedImages.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        height: 100,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _selectedImages.length,
+                          itemBuilder: (context, index) {
+                            final imagePath = _selectedImages[index];
+                            final isNetworkImage = imagePath.startsWith('http');
+                            return Stack(
+                              children: [
+                                Container(
+                                  margin: const EdgeInsets.only(right: 12),
+                                  width: 100, height: 100,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    image: DecorationImage(
+                                      fit: BoxFit.cover,
+                                      image: isNetworkImage ? NetworkImage(imagePath) as ImageProvider : FileImage(File(imagePath)),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 4, right: 16,
+                                  child: GestureDetector(
+                                    onTap: () => _removeImage(index),
+                                    child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle), child: const Icon(Icons.close, color: Colors.white, size: 14)),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ]
                   ],
                 ),
               ),

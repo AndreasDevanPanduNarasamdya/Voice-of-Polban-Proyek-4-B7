@@ -25,13 +25,14 @@ class LocalDraftAdapter extends TypeAdapter<LocalDraft> {
       status: fields[5] as PostStatus,
       updatedAt: fields[6] as DateTime,
       rejectionNote: fields[7] as String?,
+      imageUrls: (fields[8] as List?)?.cast<String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, LocalDraft obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.localId)
       ..writeByte(1)
@@ -47,7 +48,9 @@ class LocalDraftAdapter extends TypeAdapter<LocalDraft> {
       ..writeByte(6)
       ..write(obj.updatedAt)
       ..writeByte(7)
-      ..write(obj.rejectionNote);
+      ..write(obj.rejectionNote)
+      ..writeByte(8)
+      ..write(obj.imageUrls);
   }
 
   @override
