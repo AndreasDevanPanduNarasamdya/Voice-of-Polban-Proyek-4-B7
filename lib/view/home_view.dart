@@ -146,6 +146,7 @@ class _HomePageState extends State<HomePage> {
     final title = parsed['title'] ?? '';
     final authorId = parsed['author_id']?.toString() ?? '';
     final dateString = DateFormat('EEEE, dd MMMM yyyy').format(post.cachedAt);
+    final imageUrls = parsed['imageUrls'] as List<dynamic>? ?? [];
 
     final authorName = _getAuthorName(authorId);
 
@@ -203,14 +204,27 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(height: 12),
-            Container(
-              height: 250,
-              width: double.infinity,
-              color: const Color(0xFF2A2A2A),
-              child: const Center(
-                child: Icon(Icons.image, color: Colors.grey, size: 50),
+            if (imageUrls.isNotEmpty)
+              Container(
+                height: 250,
+                width: double.infinity,
+                color: const Color(0xFF2A2A2A),
+                child: Image.network(
+                  imageUrls.first.toString(), // Show only the first image on the feed
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const Center(child: Icon(Icons.broken_image, color: Colors.grey, size: 50)),
+                ),
+              )
+            else
+              Container(
+                height: 250,
+                width: double.infinity,
+                color: const Color(0xFF2A2A2A),
+                child: const Center(
+                  child: Icon(Icons.image, color: Colors.grey, size: 50),
+                ),
               ),
-            ),
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 12.0,

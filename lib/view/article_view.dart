@@ -140,13 +140,34 @@ class _ArticlePageState extends State<ArticlePage> {
             const SizedBox(height: 16),
 
             // Main Image
-            Container(
-              height: 250,
-              color: const Color(0xFF2A2A2A),
-              child: const Center(
-                child: Icon(Icons.image, color: Colors.grey, size: 50),
+            // --- DYNAMIC IMAGE GALLERY ---
+            // Main Image
+            if (parsed['imageUrls'] != null && (parsed['imageUrls'] as List).isNotEmpty)
+              SizedBox(
+                height: 250,
+                width: double.infinity,
+                child: PageView.builder(
+                  itemCount: (parsed['imageUrls'] as List).length,
+                  itemBuilder: (context, index) {
+                    return Image.network(
+                      (parsed['imageUrls'] as List)[index].toString(),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Center(child: Icon(Icons.broken_image, color: Colors.red, size: 50)),
+                    );
+                  },
+                ),
+              )
+            else
+              Container(
+                height: 250,
+                width: double.infinity,
+                color: const Color(0xFF2A2A2A),
+                child: const Center(
+                  child: Icon(Icons.image, color: Colors.grey, size: 50),
+                ),
               ),
-            ),
+            // -----------------------------
 
             // Content Text
             Padding(

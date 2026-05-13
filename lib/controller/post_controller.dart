@@ -109,8 +109,9 @@ class PostController {
         final fileExt = path.split('.').last;
         final fileName = '${postId}_${DateTime.now().millisecondsSinceEpoch}_$i.$fileExt';
         
-        await supabase.storage.from('post_images').upload(fileName, file);
-        final publicUrl = supabase.storage.from('post_images').getPublicUrl(fileName);
+        // Make sure both of these say 'post_attachments'
+        await supabase.storage.from('post_attachments').upload(fileName, file);
+        final publicUrl = supabase.storage.from('post_attachments').getPublicUrl(fileName);
         uploadedUrls.add(publicUrl);
       } catch (e) {
         debugPrint('Failed to upload image $path: $e');
@@ -248,12 +249,13 @@ class PostController {
   }
 
   /// Fetch published posts from Supabase, update local cache, and return them.
-  Future<List<CachedPost>> fetchFeed() async {
+Future<List<CachedPost>> fetchFeed() async {
     final supabase = Supabase.instance.client;
     try {
       final rows = await supabase
           .from('posts')
-          .select('post_id, title, content, author_id, status, created_at')
+          // ADDED THE ATTACHMENTS JOIN HERE
+          .select('post_id, title, content, author_id, status, created_at, attachments(attachment_details(file_path))')
           .eq('status', PostStatus.published.name)
           .order('created_at', ascending: false);
 
@@ -263,33 +265,33 @@ class PostController {
         final postId = (map['post_id'] ?? map['id'] ?? '').toString();
         final title = (map['title'] ?? '').toString();
         final content = (map['content'] ?? '').toString();
+        
         final createdAtRaw = map['created_at'];
-        DateTime createdAt;
-        if (createdAtRaw is String) {
-          createdAt = DateTime.tryParse(createdAtRaw) ?? DateTime.now();
-        } else if (createdAtRaw is DateTime) {
-          createdAt = createdAtRaw;
-        } else {
-          createdAt = DateTime.now();
+        DateTime createdAt = (createdAtRaw is String) ? (DateTime.tryParse(createdAtRaw) ?? DateTime.now()) : DateTime.now();
+
+        // EXTRACT IMAGES SAFELY
+        List<String> imageUrls = [];
+        final attachments = map['attachments'] as List<dynamic>?;
+        if (attachments != null && attachments.isNotEmpty) {
+          final details = attachments.first['attachment_details'] as List<dynamic>?;
+          if (details != null) {
+            imageUrls = details.map((d) => d['file_path'].toString()).toList();
+          }
         }
 
         final cachedData = jsonEncode({
           'title': title,
           'content': content,
           'author_id': map['author_id'],
+          'imageUrls': imageUrls, // SAVE IMAGES TO CACHE
         });
 
         if (postId.isEmpty) continue;
 
-        final cachedPost = CachedPost(
-          postId: postId,
-          cachedData: cachedData,
-          cachedAt: createdAt,
-        );
+        final cachedPost = CachedPost(postId: postId, cachedData: cachedData, cachedAt: createdAt);
         await _cachedPostsBox.put(postId, cachedPost);
         posts.add(cachedPost);
       }
-
       return posts;
     } catch (e) {
       debugPrint('Failed to fetch feed from Supabase: $e');
@@ -297,12 +299,13 @@ class PostController {
     }
   }
 
-  Future<List<CachedPost>> fetchPendingPosts() async {
+Future<List<CachedPost>> fetchPendingPosts() async {
     final supabase = Supabase.instance.client;
     try {
       final rows = await supabase
           .from('posts')
-          .select('post_id, title, content, author_id, status, created_at')
+          // ADDED THE ATTACHMENTS JOIN HERE
+          .select('post_id, title, content, author_id, status, created_at, attachments(attachment_details(file_path))')
           .eq('status', PostStatus.pending.name)
           .order('created_at', ascending: false);
 
@@ -312,6 +315,16 @@ class PostController {
         final postId = (map['post_id'] ?? map['id'] ?? '').toString();
         if (postId.isEmpty) continue;
 
+        // EXTRACT IMAGES SAFELY
+        List<String> imageUrls = [];
+        final attachments = map['attachments'] as List<dynamic>?;
+        if (attachments != null && attachments.isNotEmpty) {
+          final details = attachments.first['attachment_details'] as List<dynamic>?;
+          if (details != null) {
+            imageUrls = details.map((d) => d['file_path'].toString()).toList();
+          }
+        }
+
         final cachedPost = CachedPost(
           postId: postId,
           cachedData: jsonEncode({
@@ -319,16 +332,14 @@ class PostController {
             'content': (map['content'] ?? '').toString(),
             'author_id': map['author_id'],
             'status': PostStatus.pending.name,
+            'imageUrls': imageUrls, // SAVE IMAGES TO CACHE
           }),
-          cachedAt:
-              DateTime.tryParse((map['created_at'] ?? '').toString()) ??
-              DateTime.now(),
+          cachedAt: DateTime.tryParse((map['created_at'] ?? '').toString()) ?? DateTime.now(),
         );
 
         await _cachedPostsBox.put(postId, cachedPost);
         posts.add(cachedPost);
       }
-
       return posts;
     } catch (e) {
       debugPrint('Failed to fetch pending posts from Supabase: $e');
