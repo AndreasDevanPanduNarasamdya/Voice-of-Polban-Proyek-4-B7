@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/cached_post.dart';
 import '../models/cached_user.dart';
+import '../auth/auth_controller.dart';
 
 class ArticlePage extends StatefulWidget {
   final String articleId;
@@ -15,21 +16,78 @@ class ArticlePage extends StatefulWidget {
 
 class _ArticlePageState extends State<ArticlePage> {
   CachedPost? _post;
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+  double _galleryHeight = 250;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _preloadImageHeights(List<String> urls, double maxWidth) {
+    for (final url in urls) {
+      final image = NetworkImage(url);
+      final stream = image.resolve(const ImageConfiguration());
+      stream.addListener(
+        ImageStreamListener((info, _) {
+          final imgH = info.image.height.toDouble();
+          final imgW = info.image.width.toDouble();
+          if (imgW == 0) return;
+          final ratio = imgH / imgW;
+          final displayH = maxWidth * ratio;
+          if (displayH > _galleryHeight && mounted) {
+            setState(() => _galleryHeight = displayH);
+          }
+        }),
+      );
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _post = Hive.box<CachedPost>('cached_post_box').get(widget.articleId);
+    if (_post != null) {
+      final parsed = jsonDecode(_post!.cachedData) as Map<String, dynamic>;
+      final urls = (parsed['imageUrls'] as List? ?? [])
+          .map((e) => e.toString())
+          .toList();
+      if (urls.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final width = MediaQuery.of(context).size.width;
+          _preloadImageHeights(urls, width);
+        });
+      }
+    }
   }
 
-  // 2. Helper to fetch the real name matching the ERD relation
   String _getAuthorName(String authorId) {
     final user = Hive.box<CachedUser>('cached_user_box').get(authorId);
     return user?.name ?? "Penulis Tidak Diketahui";
   }
 
+  String _getAuthorAvatar(String authorId) {
+    final user = Hive.box<CachedUser>('cached_user_box').get(authorId);
+    return user?.avatarUrl ?? '';
+  }
+
+  Widget _buildAvatar(String avatarUrl, double radius) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.grey[700],
+      backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+      child: avatarUrl.isEmpty
+          ? Icon(Icons.person, color: Colors.white70, size: radius)
+          : null,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final myAvatarUrl = AuthController().currentUser?.avatarUrl ?? '';
+
     if (_post == null) {
       return Scaffold(
         backgroundColor: Colors.black,
@@ -49,7 +107,6 @@ class _ArticlePageState extends State<ArticlePage> {
       );
     }
 
-    // 3. Format the real database timestamp
     final p = _post!;
     final parsed = jsonDecode(p.cachedData) as Map<String, dynamic>;
     final title = parsed['title'] ?? '';
@@ -57,6 +114,7 @@ class _ArticlePageState extends State<ArticlePage> {
     final authorId = parsed['author_id']?.toString() ?? '';
     final dateString = DateFormat('EEEE, dd MMMM yyyy').format(p.cachedAt);
     final authorName = _getAuthorName(authorId);
+    final authorAvatar = _getAuthorAvatar(authorId);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -67,13 +125,10 @@ class _ArticlePageState extends State<ArticlePage> {
           icon: const Icon(Icons.arrow_back_ios, color: Color(0xFFFF8C00)),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: const [
+        actions: [
           Padding(
-            padding: EdgeInsets.only(right: 16.0),
-            child: CircleAvatar(
-              radius: 16,
-              backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
-            ),
+            padding: const EdgeInsets.only(right: 16.0),
+            child: _buildAvatar(myAvatarUrl, 16),
           ),
         ],
       ),
@@ -99,34 +154,20 @@ class _ArticlePageState extends State<ArticlePage> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
                 children: [
-                  const CircleAvatar(
-                    radius: 16,
-                    backgroundImage: NetworkImage(
-                      'https://i.pravatar.cc/100?img=11',
-                    ),
-                  ),
+                  _buildAvatar(authorAvatar, 16),
                   const SizedBox(width: 10),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            authorName, // REAL author name
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            "Fellas",
-                            style: TextStyle(color: Colors.grey, fontSize: 12),
-                          ),
-                        ],
+                      Text(
+                        authorName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
-                        dateString, // REAL published date
+                        dateString,
                         style: const TextStyle(
                           color: Colors.grey,
                           fontSize: 12,
@@ -139,41 +180,73 @@ class _ArticlePageState extends State<ArticlePage> {
             ),
             const SizedBox(height: 16),
 
-            // Main Image
-            // --- DYNAMIC IMAGE GALLERY ---
-            // Main Image
-            if (parsed['imageUrls'] != null && (parsed['imageUrls'] as List).isNotEmpty)
-              SizedBox(
-                height: 250,
-                width: double.infinity,
-                child: PageView.builder(
-                  itemCount: (parsed['imageUrls'] as List).length,
-                  itemBuilder: (context, index) {
-                    return Image.network(
-                      (parsed['imageUrls'] as List)[index].toString(),
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Center(child: Icon(Icons.broken_image, color: Colors.red, size: 50)),
-                    );
-                  },
-                ),
-              )
-            else
-              Container(
-                height: 250,
-                width: double.infinity,
-                color: const Color(0xFF2A2A2A),
-                child: const Center(
-                  child: Icon(Icons.image, color: Colors.grey, size: 50),
-                ),
+            // Image gallery — natural ratio + dot indicators
+            if (parsed['imageUrls'] != null &&
+                (parsed['imageUrls'] as List).isNotEmpty)
+              Builder(
+                builder: (context) {
+                  final urls = (parsed['imageUrls'] as List)
+                      .map((e) => e.toString())
+                      .toList();
+                  return Column(
+                    children: [
+                      SizedBox(
+                        height: _galleryHeight,
+                        width: double.infinity,
+                        child: PageView.builder(
+                          controller: _pageController,
+                          itemCount: urls.length,
+                          onPageChanged: (i) =>
+                              setState(() => _currentPage = i),
+                          itemBuilder: (context, index) {
+                            return Image.network(
+                              urls[index],
+                              width: double.infinity,
+                              fit: BoxFit.fitWidth,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Center(
+                                    child: Icon(
+                                      Icons.broken_image,
+                                      color: Colors.red,
+                                      size: 50,
+                                    ),
+                                  ),
+                            );
+                          },
+                        ),
+                      ),
+                      if (urls.length > 1) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(urls.length, (i) {
+                            final active = i == _currentPage;
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              width: active ? 16 : 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: active
+                                    ? const Color(0xFFFF6D00)
+                                    : Colors.white24,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            );
+                          }),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ],
+                  );
+                },
               ),
-            // -----------------------------
 
-            // Content Text
+            // Content
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text(
-                content, // REAL content
+                content,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 14,
@@ -181,9 +254,6 @@ class _ArticlePageState extends State<ArticlePage> {
                 ),
               ),
             ),
-
-            // --- STATIC UI BELOW ---
-            // (Awaiting implementation of your VOTE and COMMENT tables)
 
             // Interaction Bar
             Padding(
@@ -203,8 +273,8 @@ class _ArticlePageState extends State<ArticlePage> {
                       color: const Color(0xFF1E1E1E),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Row(
-                      children: const [
+                    child: const Row(
+                      children: [
                         Icon(
                           Icons.arrow_upward,
                           color: Color(0xFFFF8C00),
@@ -248,7 +318,7 @@ class _ArticlePageState extends State<ArticlePage> {
             ),
             const Divider(color: Color(0xFF333333)),
 
-            // Comment Input Area
+            // Comment Input
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Container(
@@ -261,15 +331,10 @@ class _ArticlePageState extends State<ArticlePage> {
                   borderRadius: BorderRadius.circular(30),
                 ),
                 child: Row(
-                  children: const [
-                    CircleAvatar(
-                      radius: 12,
-                      backgroundImage: NetworkImage(
-                        'https://i.pravatar.cc/100',
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Text(
+                  children: [
+                    _buildAvatar(myAvatarUrl, 12),
+                    const SizedBox(width: 12),
+                    const Text(
                       "Tulis Komentar",
                       style: TextStyle(
                         color: Color(0xFFFF8C00),
@@ -281,7 +346,6 @@ class _ArticlePageState extends State<ArticlePage> {
               ),
             ),
 
-            // Dummy Comments List
             _buildDummyComment("Richard Joe", "🔥🔥🔥"),
             _buildDummyComment("Christie Lee", "🔥🔥🔥"),
             const SizedBox(height: 30),
@@ -297,9 +361,11 @@ class _ArticlePageState extends State<ArticlePage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const CircleAvatar(
+          // Dummy commenters keep placeholder since we don't have their data
+          CircleAvatar(
             radius: 14,
-            backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=11'),
+            backgroundColor: Colors.grey[700],
+            child: const Icon(Icons.person, color: Colors.white70, size: 14),
           ),
           const SizedBox(width: 12),
           Column(

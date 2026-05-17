@@ -36,9 +36,25 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  Widget _buildAvatar(String avatarUrl, double radius) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.grey[700],
+      backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+      child: avatarUrl.isEmpty
+          ? Icon(Icons.person, color: Colors.white70, size: radius)
+          : null,
+    );
+  }
+
   String _getAuthorName(String authorId) {
     final user = Hive.box<CachedUser>('cached_user_box').get(authorId);
     return user?.name ?? "Penulis Tidak Diketahui";
+  }
+
+  String _getAuthorAvatar(String authorId) {
+    final user = Hive.box<CachedUser>('cached_user_box').get(authorId);
+    return user?.avatarUrl ?? '';
   }
 
   @override
@@ -57,12 +73,12 @@ class _HomePageState extends State<HomePage> {
             backgroundColor: const Color(0xFF121212),
             elevation: 0,
             iconTheme: const IconThemeData(color: Color(0xFFFF8C00)),
-            actions: const [
+            actions: [
               Padding(
-                padding: EdgeInsets.only(right: 16.0),
-                child: CircleAvatar(
-                  radius: 16,
-                  backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
+                padding: const EdgeInsets.only(right: 16.0),
+                child: _buildAvatar(
+                  _authController.currentUser?.avatarUrl ?? '',
+                  16,
                 ),
               ),
             ],
@@ -100,8 +116,9 @@ class _HomePageState extends State<HomePage> {
                   itemBuilder: (context, index) {
                     final post = posts[index];
                     return _buildArticleCard(context, post);
-                },
-              ));
+                  },
+                ),
+              );
             },
           ),
 
@@ -149,6 +166,7 @@ class _HomePageState extends State<HomePage> {
     final imageUrls = parsed['imageUrls'] as List<dynamic>? ?? [];
 
     final authorName = _getAuthorName(authorId);
+    final authorAvatar = _getAuthorAvatar(authorId);
 
     return InkWell(
       onTap: () {
@@ -169,12 +187,7 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.all(12.0),
               child: Row(
                 children: [
-                  const CircleAvatar(
-                    radius: 12,
-                    backgroundImage: NetworkImage(
-                      'https://i.pravatar.cc/100?img=11',
-                    ),
-                  ),
+                  _buildAvatar(authorAvatar, 12),
                   const SizedBox(width: 8),
                   Text(
                     authorName,
@@ -206,23 +219,19 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 12),
             if (imageUrls.isNotEmpty)
               Container(
-                height: 250,
+                height: 240,
                 width: double.infinity,
                 color: const Color(0xFF2A2A2A),
                 child: Image.network(
-                  imageUrls.first.toString(), // Show only the first image on the feed
+                  imageUrls.first.toString(),
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const Center(child: Icon(Icons.broken_image, color: Colors.grey, size: 50)),
-                ),
-              )
-            else
-              Container(
-                height: 250,
-                width: double.infinity,
-                color: const Color(0xFF2A2A2A),
-                child: const Center(
-                  child: Icon(Icons.image, color: Colors.grey, size: 50),
+                  errorBuilder: (context, error, stackTrace) => const Center(
+                    child: Icon(
+                      Icons.broken_image,
+                      color: Colors.grey,
+                      size: 50,
+                    ),
+                  ),
                 ),
               ),
             Padding(

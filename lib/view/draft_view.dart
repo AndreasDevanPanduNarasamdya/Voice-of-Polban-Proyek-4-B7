@@ -19,7 +19,7 @@ class DraftPage extends StatefulWidget {
 }
 
 class _DraftPageState extends State<DraftPage> {
-  static const Color _bgColor     = Color(0xFF1A1A1A);
+  static const Color _bgColor = Color(0xFF1A1A1A);
   static const Color _orangeColor = Color(0xFFFF6D00);
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -38,10 +38,8 @@ class _DraftPageState extends State<DraftPage> {
 
     final box = Hive.box<LocalDraft>('local_draft_box');
 
-    return box.values
-            .where((a) => a.userId == currentUserId)
-            .toList()
-          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return box.values.where((a) => a.userId == currentUserId).toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
   String _getAuthorName(String authorId) {
@@ -50,10 +48,28 @@ class _DraftPageState extends State<DraftPage> {
   }
 
   String _formatDate(DateTime dt) {
-    const days = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
+    const days = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu',
+    ];
     const months = [
-      'Januari','Februari','Maret','April','Mei','Juni',
-      'Juli','Agustus','September','Oktober','November','Desember'
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
     ];
     return '${days[dt.weekday - 1]}, ${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
@@ -74,9 +90,18 @@ class _DraftPageState extends State<DraftPage> {
           text: const TextSpan(
             style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             children: [
-              TextSpan(text: 'V', style: TextStyle(color: Color(0xFFFF6D00))),
-              TextSpan(text: 'o', style: TextStyle(color: Colors.white)),
-              TextSpan(text: 'P', style: TextStyle(color: Color(0xFFFF6D00))),
+              TextSpan(
+                text: 'V',
+                style: TextStyle(color: Color(0xFFFF6D00)),
+              ),
+              TextSpan(
+                text: 'o',
+                style: TextStyle(color: Colors.white),
+              ),
+              TextSpan(
+                text: 'P',
+                style: TextStyle(color: Color(0xFFFF6D00)),
+              ),
             ],
           ),
         ),
@@ -84,10 +109,25 @@ class _DraftPageState extends State<DraftPage> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 14),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.grey[700],
-              child: const Icon(Icons.person, color: Colors.white70, size: 20),
+            child: Builder(
+              builder: (context) {
+                // [CHANGED: Uses the real avatarUrl from Hive instead of pravatar.cc]
+                final avatarUrl = _authController.currentUser?.avatarUrl ?? '';
+                return CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.grey[700],
+                  backgroundImage: avatarUrl.isNotEmpty
+                      ? NetworkImage(avatarUrl)
+                      : null,
+                  child: avatarUrl.isEmpty
+                      ? const Icon(
+                          Icons.person,
+                          color: Colors.white70,
+                          size: 20,
+                        )
+                      : null,
+                );
+              },
             ),
           ),
         ],
@@ -103,8 +143,10 @@ class _DraftPageState extends State<DraftPage> {
                 children: [
                   Icon(Icons.inbox_outlined, color: Colors.white24, size: 56),
                   SizedBox(height: 12),
-                  Text('Belum ada artikel',
-                      style: TextStyle(color: Colors.white38, fontSize: 15)),
+                  Text(
+                    'Belum ada artikel',
+                    style: TextStyle(color: Colors.white38, fontSize: 15),
+                  ),
                 ],
               ),
             );
@@ -148,15 +190,17 @@ class _DraftCard extends StatefulWidget {
 class _DraftCardState extends State<_DraftCard> {
   bool _expanded = false;
 
-  static const Color _bgColor      = Color(0xFF1A1A1A);
-  static const Color _redColor     = Color(0xFFE53935);
-  static const Color _greenColor   = Color(0xFF43A047);
-  static const Color _orangeColor  = Color(0xFFFF6D00);
+  static const Color _bgColor = Color(0xFF1A1A1A);
+  static const Color _redColor = Color(0xFFE53935);
+  static const Color _greenColor = Color(0xFF43A047);
+  static const Color _orangeColor = Color(0xFFFF6D00);
 
   @override
   Widget build(BuildContext context) {
     final article = widget.article;
-    final isDropped = article.status == PostStatus.dropped || article.status == PostStatus.archived;
+    final isDropped =
+        article.status == PostStatus.dropped ||
+        article.status == PostStatus.archived;
 
     return GestureDetector(
       // Tapping the card navigates to article page
@@ -170,7 +214,9 @@ class _DraftCardState extends State<_DraftCard> {
       },
       child: Container(
         decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Color(0xFF2A2A2A), width: 1)),
+          border: Border(
+            bottom: BorderSide(color: Color(0xFF2A2A2A), width: 1),
+          ),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Column(
@@ -206,7 +252,9 @@ class _DraftCardState extends State<_DraftCard> {
                   ),
                   const SizedBox(width: 4),
                   Icon(
-                    _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    _expanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
                     color: Colors.white54,
                     size: 18,
                   ),
@@ -224,21 +272,29 @@ class _DraftCardState extends State<_DraftCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 10),
-                  if (article.imageUrls != null && article.imageUrls!.isNotEmpty)
+                  if (article.imageUrls != null &&
+                      article.imageUrls!.isNotEmpty)
                     ...article.imageUrls!.map((imgPath) {
                       final isNetwork = imgPath.startsWith('http');
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        width: double.infinity,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          color: const Color(0xFF2A2A2A),
-                          image: DecorationImage(
-                            fit: BoxFit.cover,
-                            image: isNetwork
-                                ? NetworkImage(imgPath) as ImageProvider
-                                : FileImage(File(imgPath)),
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: isNetwork
+                                ? Image.network(
+                                    imgPath,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Center(
+                                      child: Icon(
+                                        Icons.broken_image,
+                                        color: Colors.white24,
+                                        size: 40,
+                                      ),
+                                    ),
+                                  )
+                                : Image.file(File(imgPath), fit: BoxFit.cover),
                           ),
                         ),
                       );
@@ -252,7 +308,11 @@ class _DraftCardState extends State<_DraftCard> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Center(
-                        child: Icon(Icons.image_outlined, color: Colors.white24, size: 40),
+                        child: Icon(
+                          Icons.image_outlined,
+                          color: Colors.white24,
+                          size: 40,
+                        ),
                       ),
                     ),
                 ],
@@ -326,7 +386,9 @@ class _DraftCardState extends State<_DraftCard> {
               bgColor: const Color(0xFF2A2A2A),
               onTap: () async {
                 article.status = PostStatus.dropped;
-                await Hive.box<LocalDraft>('local_draft_box').put(article.localId, article);
+                await Hive.box<LocalDraft>(
+                  'local_draft_box',
+                ).put(article.localId, article);
               },
             ),
             const Spacer(),
@@ -443,53 +505,51 @@ class _DraftCardState extends State<_DraftCard> {
     required Color color,
     required Color bgColor,
     required VoidCallback onTap,
-  }) =>
-      InkWell(
-        onTap: onTap,
+  }) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(20),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: bgColor,
         borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 16),
-              const SizedBox(width: 6),
-              Text(label, style: TextStyle(color: color, fontSize: 13)),
-            ],
-          ),
-        ),
-      );
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(color: color, fontSize: 13)),
+        ],
+      ),
+    ),
+  );
 
   Widget _statusChip({
     required IconData icon,
     required String label,
     required Color color,
     required bool filled,
-  }) =>
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: filled ? color : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color),
+  }) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    decoration: BoxDecoration(
+      color: filled ? color : Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: color),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: filled ? Colors.white : color, size: 14),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: filled ? Colors.white : color,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: filled ? Colors.white : color, size: 14),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: filled ? Colors.white : color,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      );
+      ],
+    ),
+  );
 }

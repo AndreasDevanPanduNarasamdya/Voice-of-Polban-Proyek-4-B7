@@ -21,7 +21,7 @@ class EditorPage extends StatefulWidget {
 }
 
 class _EditorPageState extends State<EditorPage> {
-  final AuthController _AuthController =AuthController();
+  final AuthController _AuthController = AuthController();
   late final PostController _controller;
 
   @override
@@ -35,6 +35,22 @@ class _EditorPageState extends State<EditorPage> {
   String _getAuthorName(String authorId) {
     final user = Hive.box<CachedUser>('cached_user_box').get(authorId);
     return user?.name ?? "Penulis Tidak Diketahui";
+  }
+
+  String _getAuthorAvatar(String authorId) {
+    final user = Hive.box<CachedUser>('cached_user_box').get(authorId);
+    return user?.avatarUrl ?? '';
+  }
+
+  Widget _buildAvatar(String avatarUrl, double radius) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: const Color(0xFFFF6D00),
+      backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+      child: avatarUrl.isEmpty
+          ? Icon(Icons.person, color: Colors.white70, size: radius)
+          : null,
+    );
   }
 
   // The Review Dialog to enforce your Anti-Mass-Approval rule
@@ -104,45 +120,53 @@ class _EditorPageState extends State<EditorPage> {
                     backgroundColor: isApprove ? Colors.green : Colors.red,
                   ),
                   onPressed: () async {
-                  // 1. Initial success state
-                  bool success = false;
+                    // 1. Initial success state
+                    bool success = false;
 
-                  try {
-                    if (isApprove) {
-                      // 2. Call approvePost from your controller
-                      success = await _controller.approvePost(post.postId);
-                    } else {
-                      // 3. Call rejectPost and pass the note from the text field
-                      // Ensure your controller's rejectPost accepts a 'note' parameter
-                      success = await _controller.rejectPost(post.postId, note: noteController.text);
-                    }
-
-                    if (!success) {
-                      // 4. Handle failure by showing the error message in the UI
-                      setState(() {
-                        errorMessage = "Gagal memproses perubahan status artikel.";
-                      });
-                    } else {
-                      // 5. Success flow: Close dialog and show SnackBar
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              isApprove ? "Artikel Dipublikasikan!" : "Artikel Ditolak",
-                            ),
-                            backgroundColor: isApprove ? Colors.green : Colors.red,
-                          ),
+                    try {
+                      if (isApprove) {
+                        // 2. Call approvePost from your controller
+                        success = await _controller.approvePost(post.postId);
+                      } else {
+                        // 3. Call rejectPost and pass the note from the text field
+                        // Ensure your controller's rejectPost accepts a 'note' parameter
+                        success = await _controller.rejectPost(
+                          post.postId,
+                          note: noteController.text,
                         );
                       }
+
+                      if (!success) {
+                        // 4. Handle failure by showing the error message in the UI
+                        setState(() {
+                          errorMessage =
+                              "Gagal memproses perubahan status artikel.";
+                        });
+                      } else {
+                        // 5. Success flow: Close dialog and show SnackBar
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                isApprove
+                                    ? "Artikel Dipublikasikan!"
+                                    : "Artikel Ditolak",
+                              ),
+                              backgroundColor: isApprove
+                                  ? Colors.green
+                                  : Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      // 6. Catch unexpected errors to prevent app crashes
+                      setState(() {
+                        errorMessage = "Terjadi kesalahan: $e";
+                      });
                     }
-                  } catch (e) {
-                    // 6. Catch unexpected errors to prevent app crashes
-                    setState(() {
-                      errorMessage = "Terjadi kesalahan: $e";
-                    });
-                  }
-                },
+                  },
                   child: Text(
                     isApprove ? "Publikasi" : "Tolak",
                     style: const TextStyle(color: Colors.white),
@@ -168,10 +192,28 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   String _formatDate(DateTime dt) {
-    const days = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
+    const days = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu',
+    ];
     const months = [
-      'Januari','Februari','Maret','April','Mei','Juni',
-      'Juli','Agustus','September','Oktober','November','Desember'
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
     ];
     return '${days[dt.weekday - 1]}, ${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
@@ -191,20 +233,28 @@ class _EditorPageState extends State<EditorPage> {
           text: const TextSpan(
             style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
             children: [
-              TextSpan(text: 'V', style: TextStyle(color: Color(0xFFFF6D00))),
-              TextSpan(text: 'O', style: TextStyle(color: Colors.white)),
-              TextSpan(text: 'P', style: TextStyle(color: Color(0xFFFF6D00))),
+              TextSpan(
+                text: 'V',
+                style: TextStyle(color: Color(0xFFFF6D00)),
+              ),
+              TextSpan(
+                text: 'O',
+                style: TextStyle(color: Colors.white),
+              ),
+              TextSpan(
+                text: 'P',
+                style: TextStyle(color: Color(0xFFFF6D00)),
+              ),
             ],
           ),
         ),
         centerTitle: true,
-        actions: const [
+        actions: [
           Padding(
-            padding: EdgeInsets.only(right: 14),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: Color(0xFFFF6D00),
-              backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
+            padding: const EdgeInsets.only(right: 14),
+            child: _buildAvatar(
+              _AuthController.currentUser?.avatarUrl ?? '',
+              18,
             ),
           ),
         ],
@@ -215,8 +265,7 @@ class _EditorPageState extends State<EditorPage> {
           final pendingPosts = box.values.where((p) {
             final data = jsonDecode(p.cachedData);
             return data['status'] == PostStatus.pending.name;
-          }).toList()
-            ..sort((a, b) => b.cachedAt.compareTo(a.cachedAt));
+          }).toList()..sort((a, b) => b.cachedAt.compareTo(a.cachedAt));
 
           if (pendingPosts.isEmpty) {
             return const Center(
@@ -225,8 +274,10 @@ class _EditorPageState extends State<EditorPage> {
                 children: [
                   Icon(Icons.inbox_outlined, color: Colors.white24, size: 56),
                   SizedBox(height: 12),
-                  Text('Tidak ada artikel yang perlu direview.',
-                      style: TextStyle(color: Colors.white38, fontSize: 15)),
+                  Text(
+                    'Tidak ada artikel yang perlu direview.',
+                    style: TextStyle(color: Colors.white38, fontSize: 15),
+                  ),
                 ],
               ),
             );
@@ -244,15 +295,16 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   Widget _buildEditorCard(BuildContext context, CachedPost post) {
-// 1. Decode JSON to get the hidden fields
+    // 1. Decode JSON to get the hidden fields
     final data = jsonDecode(post.cachedData);
-    
+
     // 2. Extract the correct author_id and title
     final authorId = data['author_id']?.toString() ?? '';
     final title = data['title']?.toString() ?? 'Tanpa Judul';
 
     // 3. Use the extracted ID and the correct cachedAt date
     final authorName = _getAuthorName(authorId);
+    final authorAvatar = _getAuthorAvatar(authorId);
     final dateStr = _formatDate(post.cachedAt);
 
     return Container(
@@ -266,27 +318,30 @@ class _EditorPageState extends State<EditorPage> {
           // Author + role badge
           Row(
             children: [
-              const CircleAvatar(
-                radius: 16,
-                backgroundColor: Color(0xFFFF6D00),
-                backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=11'),
-              ),
+              _buildAvatar(authorAvatar, 16),
               const SizedBox(width: 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Writter',
-                      style: TextStyle(color: Colors.white54, fontSize: 11)),
-                  Text(authorName,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13)),
+                  const Text(
+                    'Penulis',
+                    style: TextStyle(color: Colors.white54, fontSize: 11),
+                  ),
+                  Text(
+                    authorName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
                 ],
               ),
               const Spacer(),
-              Text(dateStr,
-                  style: const TextStyle(color: Colors.white38, fontSize: 11)),
+              Text(
+                dateStr,
+                style: const TextStyle(color: Colors.white38, fontSize: 11),
+              ),
             ],
           ),
 
@@ -296,7 +351,10 @@ class _EditorPageState extends State<EditorPage> {
           Text(
             title,
             style: const TextStyle(
-                color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+            ),
           ),
 
           const SizedBox(height: 12),
@@ -307,7 +365,8 @@ class _EditorPageState extends State<EditorPage> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                  builder: (_) => ArticlePage(articleId: post.postId)),
+                builder: (_) => ArticlePage(articleId: post.postId),
+              ),
             ),
             child: Container(
               height: 160,
@@ -317,8 +376,10 @@ class _EditorPageState extends State<EditorPage> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Center(
-                child: Text('Tap untuk membaca artikel',
-                    style: TextStyle(color: Colors.white38, fontSize: 13)),
+                child: Text(
+                  'Tap untuk membaca artikel',
+                  style: TextStyle(color: Colors.white38, fontSize: 13),
+                ),
               ),
             ),
           ),
@@ -376,11 +437,14 @@ class _EditorPageState extends State<EditorPage> {
           children: [
             Icon(icon, color: color, size: 16),
             const SizedBox(width: 6),
-            Text(label,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),

@@ -11,7 +11,7 @@ class CachedUser {
     required this.name,
     required this.email,
     required this.role,
-    required this.avatarUrl,
+    this.avatarUrl,
   });
 
   @HiveField(0)
@@ -27,5 +27,5 @@ class CachedUser {
   UserRole role;
 
   @HiveField(4)
-  String avatarUrl;
+  String? avatarUrl;
 }
