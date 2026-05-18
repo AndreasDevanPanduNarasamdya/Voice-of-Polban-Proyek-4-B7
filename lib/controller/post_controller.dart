@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-
+import '../models/cached_user.dart'; // <--- ADD THIS
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -265,32 +265,53 @@ class PostController {
     return _cachedPostsBox.values.toList(growable: false);
   }
 
-  /// Fetch published posts from Supabase, update local cache, and return them.
   Future<List<CachedPost>> fetchFeed() async {
     final supabase = Supabase.instance.client;
     try {
       final rows = await supabase
           .from('posts')
-          // ADDED THE ATTACHMENTS JOIN HERE
           .select(
-            'post_id, title, content, author_id, status, created_at, attachments(attachment_details(file_path))',
+            'post_id, title, content, author_id, status, created_at, attachments(attachment_details(file_path)), users(name, avatar_url, role)',
           )
           .eq('status', PostStatus.published.name)
           .order('created_at', ascending: false);
 
       final List<CachedPost> posts = [];
+      final usersBox = Hive.box<CachedUser>('cached_user_box');
+
       for (final row in rows as List) {
         final map = Map<String, dynamic>.from(row as Map);
         final postId = (map['post_id'] ?? map['id'] ?? '').toString();
         final title = (map['title'] ?? '').toString();
         final content = (map['content'] ?? '').toString();
+        final authorId = map['author_id']?.toString() ?? '';
+
+        final userMap = map['users'];
+        if (userMap != null && authorId.isNotEmpty) {
+          UserRole userRole = UserRole.reader;
+          try {
+            if (userMap['role'] != null) {
+              userRole = UserRole.values.byName(
+                userMap['role'].toString().toLowerCase(),
+              );
+            }
+          } catch (_) {}
+
+          final cachedAuthor = CachedUser(
+            userId: authorId,
+            name: userMap['name']?.toString() ?? 'Penulis Tidak Diketahui',
+            email: '',
+            role: userRole,
+            avatarUrl: userMap['avatar_url']?.toString() ?? '',
+          );
+          await usersBox.put(authorId, cachedAuthor);
+        }
 
         final createdAtRaw = map['created_at'];
         DateTime createdAt = (createdAtRaw is String)
             ? (DateTime.tryParse(createdAtRaw) ?? DateTime.now())
             : DateTime.now();
 
-        // EXTRACT IMAGES SAFELY
         List<String> imageUrls = [];
         final attachments = map['attachments'] as List<dynamic>?;
         if (attachments != null && attachments.isNotEmpty) {
@@ -304,8 +325,8 @@ class PostController {
         final cachedData = jsonEncode({
           'title': title,
           'content': content,
-          'author_id': map['author_id'],
-          'imageUrls': imageUrls, // SAVE IMAGES TO CACHE
+          'author_id': authorId,
+          'imageUrls': imageUrls,
         });
 
         if (postId.isEmpty) continue;
@@ -325,23 +346,41 @@ class PostController {
     }
   }
 
+  /// Fetch published posts from Supabase, update local cache, and return them.
   Future<List<CachedPost>> fetchPendingPosts() async {
     final supabase = Supabase.instance.client;
     try {
       final rows = await supabase
           .from('posts')
-          // ADDED THE ATTACHMENTS JOIN HERE
+          // FIX 1: Add the users relation here too
           .select(
-            'post_id, title, content, author_id, status, created_at, attachments(attachment_details(file_path))',
+            'post_id, title, content, author_id, status, created_at, attachments(attachment_details(file_path)), users(name, avatar_url, role)',
           )
           .eq('status', PostStatus.pending.name)
           .order('created_at', ascending: false);
 
       final List<CachedPost> posts = [];
+      final usersBox = Hive.box<CachedUser>('cached_user_box');
+
       for (final row in rows as List) {
         final map = Map<String, dynamic>.from(row as Map);
         final postId = (map['post_id'] ?? map['id'] ?? '').toString();
         if (postId.isEmpty) continue;
+
+        final authorId = map['author_id']?.toString() ?? '';
+
+        // FIX 2: Cache the pending author's details
+        final userMap = map['users'];
+        if (userMap != null && authorId.isNotEmpty) {
+          final cachedAuthor = CachedUser(
+            userId: authorId,
+            name: userMap['name']?.toString() ?? 'Penulis Tidak Diketahui',
+            email: '',
+            role: UserRole.writer,
+            avatarUrl: userMap['avatar_url']?.toString() ?? '',
+          );
+          await usersBox.put(authorId, cachedAuthor);
+        }
 
         // EXTRACT IMAGES SAFELY
         List<String> imageUrls = [];
@@ -359,9 +398,9 @@ class PostController {
           cachedData: jsonEncode({
             'title': (map['title'] ?? '').toString(),
             'content': (map['content'] ?? '').toString(),
-            'author_id': map['author_id'],
+            'author_id': authorId,
             'status': PostStatus.pending.name,
-            'imageUrls': imageUrls, // SAVE IMAGES TO CACHE
+            'imageUrls': imageUrls,
           }),
           cachedAt:
               DateTime.tryParse((map['created_at'] ?? '').toString()) ??
