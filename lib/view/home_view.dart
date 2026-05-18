@@ -97,10 +97,22 @@ class _HomePageState extends State<HomePage> {
               final posts = snapshot.data ?? [];
 
               if (posts.isEmpty) {
-                return const Center(
-                  child: Text(
-                    "Belum ada artikel yang dipublikasikan.",
-                    style: TextStyle(color: Colors.white),
+                return RefreshIndicator(
+                  color: const Color(0xFFFF8C00),
+                  backgroundColor: const Color(0xFF1E1E1E),
+                  onRefresh: _refreshFeed, // Triggers network call
+                  child: ListView(
+                    physics:
+                        const AlwaysScrollableScrollPhysics(), // Forces pull-to-refresh to activate
+                    children: const [
+                      SizedBox(height: 150),
+                      Center(
+                        child: Text(
+                          "Belum ada artikel yang dipublikasikan.",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
                   ),
                 );
               }
@@ -219,16 +231,14 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 12),
             if (imageUrls.isNotEmpty)
               Container(
-                margin: const EdgeInsets.symmetric(horizontal: 15.0), 
-                constraints: const BoxConstraints(
-                  maxHeight: 500, 
-                ),
+                margin: const EdgeInsets.symmetric(horizontal: 15.0),
+                constraints: const BoxConstraints(maxHeight: 500),
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: const Color(0xFF2A2A2A),
-                  borderRadius: BorderRadius.circular(8.0), 
+                  borderRadius: BorderRadius.circular(8.0),
                 ),
-                clipBehavior: Clip.hardEdge, 
+                clipBehavior: Clip.hardEdge,
                 child: Image.network(
                   imageUrls.first.toString(),
                   fit: BoxFit.fitWidth,

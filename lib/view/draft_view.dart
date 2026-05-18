@@ -30,6 +30,14 @@ class _DraftPageState extends State<DraftPage> {
   void initState() {
     super.initState();
     _articleController = PostController();
+    _syncDrafts(); // Add this line
+  }
+
+  Future<void> _syncDrafts() async {
+    final userId = _authController.currentUser?.userId;
+    if (userId != null) {
+      await _articleController.syncMyArticles(userId);
+    }
   }
 
   List<LocalDraft> _getMyArticles() {
@@ -151,18 +159,25 @@ class _DraftPageState extends State<DraftPage> {
               ),
             );
           }
-          return ListView.builder(
-            padding: const EdgeInsets.only(top: 4, bottom: 24),
-            itemCount: articles.length,
-            itemBuilder: (ctx, i) {
-              final draft = articles[i];
-              return _DraftCard(
-                article: draft,
-                authorName: _getAuthorName(draft.userId),
-                dateStr: _formatDate(draft.updatedAt),
-                controller: _articleController,
-              );
-            },
+          return RefreshIndicator(
+            color: const Color(0xFFFF6D00),
+            backgroundColor: const Color(0xFF1E1E1E),
+            onRefresh: _syncDrafts, // Triggers the Supabase fetch
+            child: ListView.builder(
+              physics:
+                  const AlwaysScrollableScrollPhysics(), // Required for pull-to-refresh
+              padding: const EdgeInsets.only(top: 4, bottom: 24),
+              itemCount: articles.length,
+              itemBuilder: (ctx, i) {
+                final draft = articles[i];
+                return _DraftCard(
+                  article: draft,
+                  authorName: _getAuthorName(draft.userId),
+                  dateStr: _formatDate(draft.updatedAt),
+                  controller: _articleController,
+                );
+              },
+            ),
           );
         },
       ),
