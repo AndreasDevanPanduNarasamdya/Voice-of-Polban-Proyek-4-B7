@@ -101,7 +101,7 @@ class AuthController {
       // Check database for matching Name OR Email, AND matching Password
       final response = await supabase
           .from('users')
-          .select('user_id, name, email, role')
+          .select('user_id, name, email, role, avatar_url')
           .or('email.eq.$normalizedInput,name.eq.$normalizedInput')
           .eq('password_hash', hashedPassword)
           .maybeSingle();
@@ -124,7 +124,7 @@ class AuthController {
         name: response['name'].toString(),
         email: response['email'].toString(),
         role: userRole,
-        avatarUrl: '', // Default empty
+        avatarUrl: response['avatar_url']?.toString() ?? '',
       );
 
       // Save session locally
@@ -181,7 +181,7 @@ class AuthController {
             'password_hash': hashedPassword,
             'role': role.name,
           })
-          .select('user_id, name, email, role')
+          .select('user_id, name, email, role, avatar_url')
           .single();
 
       final cachedUser = CachedUser(
@@ -189,7 +189,7 @@ class AuthController {
         name: insertResponse['name'].toString(),
         email: insertResponse['email'].toString(),
         role: role,
-        avatarUrl: '',
+        avatarUrl: insertResponse['avatar_url']?.toString() ?? '',
       );
 
       await _usersBox.put(cachedUser.userId, cachedUser);

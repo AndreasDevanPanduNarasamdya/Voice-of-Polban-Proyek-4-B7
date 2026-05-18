@@ -26,6 +26,10 @@ class _EditorPageState extends State<EditorPage> {
     _controller.fetchPendingPosts();
   }
 
+  Future<void> _refreshEditor() async {
+    await _controller.fetchPendingPosts();
+  }
+
   // Helper to resolve Foreign Key (authorId) to Real Name
   String _getAuthorName(String authorId) {
     final user = Hive.box<CachedUser>('cached_user_box').get(authorId);
@@ -254,37 +258,54 @@ class _EditorPageState extends State<EditorPage> {
           ),
         ],
       ),
-      body: ValueListenableBuilder<Box<CachedPost>>(
-        valueListenable: Hive.box<CachedPost>('cached_post_box').listenable(),
-        builder: (context, box, _) {
-          final pendingPosts = box.values.where((p) {
-            final data = jsonDecode(p.cachedData);
-            return data['status'] == PostStatus.pending.name;
-          }).toList()..sort((a, b) => b.cachedAt.compareTo(a.cachedAt));
+      body: RefreshIndicator(
+        color: const Color(0xFFFF8C00),
+        backgroundColor: const Color(0xFF1E1E1E),
+        onRefresh: _refreshEditor,
+        child: ValueListenableBuilder<Box<CachedPost>>(
+          valueListenable: Hive.box<CachedPost>('cached_post_box').listenable(),
+          builder: (context, box, _) {
+            final pendingPosts = box.values.where((p) {
+              final data = jsonDecode(p.cachedData);
+              return data['status'] == PostStatus.pending.name;
+            }).toList()..sort((a, b) => b.cachedAt.compareTo(a.cachedAt));
 
-          if (pendingPosts.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.inbox_outlined, color: Colors.white24, size: 56),
-                  SizedBox(height: 12),
-                  Text(
-                    'Tidak ada artikel yang perlu direview.',
-                    style: TextStyle(color: Colors.white38, fontSize: 15),
+            if (pendingPosts.isEmpty) {
+              return ListView(
+                physics:
+                    const AlwaysScrollableScrollPhysics(), // Forces pull-to-refresh
+                children: const [
+                  SizedBox(height: 200),
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.inbox_outlined,
+                          color: Colors.white24,
+                          size: 56,
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          'Tidak ada artikel yang perlu direview.',
+                          style: TextStyle(color: Colors.white38, fontSize: 15),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-              ),
-            );
-          }
+              );
+            }
 
-          return ListView.builder(
-            padding: const EdgeInsets.only(top: 8, bottom: 24),
-            itemCount: pendingPosts.length,
-            itemBuilder: (context, index) =>
-                _buildEditorCard(context, pendingPosts[index]),
-          );
-        },
+            return ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(top: 8, bottom: 24),
+              itemCount: pendingPosts.length,
+              itemBuilder: (context, index) =>
+                  _buildEditorCard(context, pendingPosts[index]),
+            );
+          },
+        ),
       ),
     );
   }

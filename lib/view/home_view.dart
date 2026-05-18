@@ -97,10 +97,22 @@ class _HomePageState extends State<HomePage> {
               final posts = snapshot.data ?? [];
 
               if (posts.isEmpty) {
-                return const Center(
-                  child: Text(
-                    "Belum ada artikel yang dipublikasikan.",
-                    style: TextStyle(color: Colors.white),
+                return RefreshIndicator(
+                  color: const Color(0xFFFF8C00),
+                  backgroundColor: const Color(0xFF1E1E1E),
+                  onRefresh: _refreshFeed, // Triggers network call
+                  child: ListView(
+                    physics:
+                        const AlwaysScrollableScrollPhysics(), // Forces pull-to-refresh to activate
+                    children: const [
+                      SizedBox(height: 150),
+                      Center(
+                        child: Text(
+                          "Belum ada artikel yang dipublikasikan.",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
                   ),
                 );
               }
@@ -122,19 +134,19 @@ class _HomePageState extends State<HomePage> {
             },
           ),
 
-          bottomNavigationBar: Container(
-            color: const Color(0xFF121212),
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildNavItem(Icons.emoji_events_outlined, "Akademik", 0),
-                _buildNavItem(Icons.school_outlined, "Kampus", 1),
-                _buildNavItem(Icons.calendar_today_outlined, "Acara", 2),
-                _buildNavItem(Icons.people_outline, "Organisasi", 3),
-              ],
-            ),
-          ),
+          // bottomNavigationBar: Container(
+          //   color: const Color(0xFF121212),
+          //   padding: const EdgeInsets.symmetric(vertical: 8),
+          //   child: Row(
+          //     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          //     children: [
+          //       _buildNavItem(Icons.emoji_events_outlined, "Akademik", 0),
+          //       _buildNavItem(Icons.school_outlined, "Kampus", 1),
+          //       _buildNavItem(Icons.calendar_today_outlined, "Acara", 2),
+          //       _buildNavItem(Icons.people_outline, "Organisasi", 3),
+          //     ],
+          //   ),
+          // ),
         );
       },
     );
@@ -219,12 +231,17 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 12),
             if (imageUrls.isNotEmpty)
               Container(
-                height: 240,
+                margin: const EdgeInsets.symmetric(horizontal: 15.0),
+                constraints: const BoxConstraints(maxHeight: 500),
                 width: double.infinity,
-                color: const Color(0xFF2A2A2A),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A2A2A),
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                clipBehavior: Clip.hardEdge,
                 child: Image.network(
                   imageUrls.first.toString(),
-                  fit: BoxFit.cover,
+                  fit: BoxFit.fitWidth,
                   errorBuilder: (context, error, stackTrace) => const Center(
                     child: Icon(
                       Icons.broken_image,
