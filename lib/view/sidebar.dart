@@ -151,7 +151,7 @@ class AppSidebar extends StatelessWidget {
             onTap: () async {
               Navigator.pop(context);
               final auth = AuthController();
-              await auth.logout();
+              auth.logout();
               if (context.mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,

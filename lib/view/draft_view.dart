@@ -2,14 +2,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/app_enums.dart';
-import '../models/cached_post.dart';
 import '../models/cached_user.dart';
 import '../models/local_draft.dart';
 import '../auth/auth_controller.dart';
 import '../controller/post_controller.dart';
 import 'writer_view.dart';
 import 'article_view.dart';
-import 'dart:convert';
 
 class DraftPage extends StatefulWidget {
   const DraftPage({super.key});
@@ -19,7 +17,6 @@ class DraftPage extends StatefulWidget {
 }
 
 class _DraftPageState extends State<DraftPage> {
-  static const Color _bgColor = Color(0xFF1A1A1A);
   static const Color _orangeColor = Color(0xFFFF6D00);
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -78,9 +75,9 @@ class _DraftPageState extends State<DraftPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: _bgColor,
+      backgroundColor: const Color(0xFF1A1A1A),
       appBar: AppBar(
-        backgroundColor: _bgColor,
+        backgroundColor: const Color(0xFF1A1A1A),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: _orangeColor, size: 20),
@@ -190,7 +187,6 @@ class _DraftCard extends StatefulWidget {
 class _DraftCardState extends State<_DraftCard> {
   bool _expanded = false;
 
-  static const Color _bgColor = Color(0xFF1A1A1A);
   static const Color _redColor = Color(0xFFE53935);
   static const Color _greenColor = Color(0xFF43A047);
   static const Color _orangeColor = Color(0xFFFF6D00);
@@ -286,7 +282,7 @@ class _DraftCardState extends State<_DraftCard> {
                                 ? Image.network(
                                     imgPath,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Center(
+                                    errorBuilder: (error, stackTrace, details) => const Center(
                                       child: Icon(
                                         Icons.broken_image,
                                         color: Colors.white24,
@@ -298,7 +294,7 @@ class _DraftCardState extends State<_DraftCard> {
                           ),
                         ),
                       );
-                    }).toList()
+                    })
                   else
                     Container(
                       width: double.infinity,

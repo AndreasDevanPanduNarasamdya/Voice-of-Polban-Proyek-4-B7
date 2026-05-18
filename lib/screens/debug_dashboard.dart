@@ -27,7 +27,6 @@ class _DebugDashboardState extends State<DebugDashboard> {
   }
 
   Future<void> _bootstrap() async {
-    await _authController.seedDummyUsers();
     await _seedCachedPosts();
     if (mounted) {
       setState(() {});

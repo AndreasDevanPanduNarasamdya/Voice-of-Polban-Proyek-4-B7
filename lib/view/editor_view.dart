@@ -3,15 +3,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:voice_of_polban/auth/auth_controller.dart';
 import 'package:voice_of_polban/models/cached_post.dart';
 import 'package:voice_of_polban/models/cached_user.dart';
-import 'package:voice_of_polban/models/local_draft.dart';
 import 'package:voice_of_polban/view/article_view.dart';
-import '../models/cached_post.dart';
-import '../models/cached_user.dart';
 import '../models/app_enums.dart';
 import '../controller/post_controller.dart';
-import '../auth/auth_controller.dart';
 import 'dart:convert';
-import 'article_view.dart';
 
 class EditorPage extends StatefulWidget {
   const EditorPage({super.key});
@@ -21,7 +16,7 @@ class EditorPage extends StatefulWidget {
 }
 
 class _EditorPageState extends State<EditorPage> {
-  final AuthController _AuthController = AuthController();
+  final AuthController _authController = AuthController();
   late final PostController _controller;
 
   @override
@@ -253,7 +248,7 @@ class _EditorPageState extends State<EditorPage> {
           Padding(
             padding: const EdgeInsets.only(right: 14),
             child: _buildAvatar(
-              _AuthController.currentUser?.avatarUrl ?? '',
+              _authController.currentUser?.avatarUrl ?? '',
               18,
             ),
           ),
