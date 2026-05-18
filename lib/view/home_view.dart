@@ -219,12 +219,19 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 12),
             if (imageUrls.isNotEmpty)
               Container(
-                height: 240,
+                margin: const EdgeInsets.symmetric(horizontal: 15.0), 
+                constraints: const BoxConstraints(
+                  maxHeight: 500, 
+                ),
                 width: double.infinity,
-                color: const Color(0xFF2A2A2A),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A2A2A),
+                  borderRadius: BorderRadius.circular(8.0), 
+                ),
+                clipBehavior: Clip.hardEdge, 
                 child: Image.network(
                   imageUrls.first.toString(),
-                  fit: BoxFit.cover,
+                  fit: BoxFit.fitWidth,
                   errorBuilder: (context, error, stackTrace) => const Center(
                     child: Icon(
                       Icons.broken_image,
