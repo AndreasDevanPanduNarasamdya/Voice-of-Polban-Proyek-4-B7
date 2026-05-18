@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart'; // Used for formatting real dates
 import '../models/cached_post.dart';
 import '../models/cached_user.dart';
+import '../models/local_bookmark.dart';
 import '../models/app_enums.dart';
 import '../controller/post_controller.dart';
 import '../auth/auth_controller.dart';
@@ -20,7 +21,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final AuthController _authController = AuthController();
   final PostController _controller = PostController();
-  int _selectedIndex = 0;
   late Future<List<CachedPost>> _onlineFeed;
 
   @override
@@ -152,24 +152,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = _selectedIndex == index;
-    final color = isSelected ? const Color(0xFFFF8C00) : Colors.grey;
-    return InkWell(
-      onTap: () {
-        setState(() => _selectedIndex = index);
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(color: color, fontSize: 10)),
-        ],
-      ),
-    );
-  }
-
   Widget _buildArticleCard(BuildContext context, CachedPost post) {
     final parsed = jsonDecode(post.cachedData) as Map<String, dynamic>;
     final title = parsed['title'] ?? '';
@@ -261,7 +243,7 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   _buildInteractionPill(Icons.chat_bubble_outline, "30"),
                   const SizedBox(width: 12),
-                  _buildInteractionPillGroup(),
+                  _buildInteractionPillGroup(post.postId),
                 ],
               ),
             ),
@@ -295,7 +277,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildInteractionPillGroup() {
+  Widget _buildInteractionPillGroup(String postId) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -303,9 +285,9 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
-        children: const [
+        children: [
           Icon(Icons.arrow_upward, color: Color(0xFFFF8C00), size: 16),
-          SizedBox(width: 4),
+          const SizedBox(width: 4),
           Text(
             "300",
             style: TextStyle(
@@ -314,9 +296,9 @@ class _HomePageState extends State<HomePage> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Icon(Icons.arrow_downward, color: Color(0xFF000080), size: 16),
-          SizedBox(width: 4),
+          const SizedBox(width: 4),
           Text(
             "300",
             style: TextStyle(
@@ -325,8 +307,33 @@ class _HomePageState extends State<HomePage> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          SizedBox(width: 12),
-          Icon(Icons.bookmark_border, color: Colors.grey, size: 16),
+          const SizedBox(width: 8),
+          ValueListenableBuilder<Box<LocalBookmark>>(
+            valueListenable: Hive.box<LocalBookmark>(
+              'local_bookmark_box',
+            ).listenable(),
+            builder: (context, bookmarkBox, _) {
+              final userId = _authController.currentUser?.userId;
+              final isBookmarked =
+                  userId != null &&
+                  bookmarkBox.values.any(
+                    (bookmark) =>
+                        bookmark.userId == userId && bookmark.postId == postId,
+                  );
+
+              return IconButton(
+                constraints: const BoxConstraints(),
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _controller.toggleBookmark(postId),
+                icon: Icon(
+                  isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                  color: isBookmarked ? const Color(0xFFFF8C00) : Colors.grey,
+                  size: 16,
+                ),
+              );
+            },
+          ),
         ],
       ),
     );

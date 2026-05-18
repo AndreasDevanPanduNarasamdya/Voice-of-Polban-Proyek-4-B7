@@ -8,12 +8,14 @@ import 'package:uuid/uuid.dart';
 
 import '../models/app_enums.dart';
 import '../models/cached_post.dart';
+import '../models/local_bookmark.dart';
 import '../models/local_draft.dart';
 import '../models/sync_queue.dart';
 
 class PostController {
   static const String _draftBoxName = 'local_draft_box';
   static const String _cachedPostsBoxName = 'cached_post_box';
+  static const String _bookmarkBoxName = 'local_bookmark_box';
   static const String _queueBoxName = 'sync_queue_box';
 
   final Uuid _uuid = const Uuid();
@@ -21,7 +23,126 @@ class PostController {
   Box<LocalDraft> get _draftBox => Hive.box<LocalDraft>(_draftBoxName);
   Box<CachedPost> get _cachedPostsBox =>
       Hive.box<CachedPost>(_cachedPostsBoxName);
+  Box<LocalBookmark> get _bookmarkBox =>
+      Hive.box<LocalBookmark>(_bookmarkBoxName);
   Box<SyncQueue> get _queueBox => Hive.box<SyncQueue>(_queueBoxName);
+
+  String? get _currentUserId => Supabase.instance.client.auth.currentUser?.id;
+
+  List<String> _extractImageUrls(Map<String, dynamic> map) {
+    final attachments = map['attachments'] as List<dynamic>?;
+    if (attachments == null || attachments.isEmpty) {
+      return <String>[];
+    }
+
+    final details = attachments.first['attachment_details'] as List<dynamic>?;
+    if (details == null || details.isEmpty) {
+      return <String>[];
+    }
+
+    return details
+        .map((detail) => detail['file_path'].toString())
+        .where((path) => path.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  DateTime _parsePostDate(dynamic rawValue) {
+    if (rawValue is String) {
+      return DateTime.tryParse(rawValue) ?? DateTime.now();
+    }
+    return DateTime.now();
+  }
+
+  CachedPost? _buildCachedPost(Map<String, dynamic> map) {
+    final postId = (map['post_id'] ?? '').toString();
+    if (postId.isEmpty) {
+      return null;
+    }
+
+    return CachedPost(
+      postId: postId,
+      cachedData: jsonEncode({
+        'title': (map['title'] ?? '').toString(),
+        'content': (map['content'] ?? '').toString(),
+        'author_id': map['author_id']?.toString() ?? '',
+        'imageUrls': _extractImageUrls(map),
+        'status': (map['status'] ?? PostStatus.published.name).toString(),
+        if (map['rejection_note'] != null)
+          'rejection_note': map['rejection_note'].toString(),
+      }),
+      cachedAt: _parsePostDate(map['created_at']),
+    );
+  }
+
+  Future<CachedPost?> _fetchAndCachePostById(String postId) async {
+    if (postId.trim().isEmpty) {
+      return null;
+    }
+
+    final supabase = Supabase.instance.client;
+    try {
+      final row = await supabase
+          .from('posts')
+          .select(
+            'post_id, title, content, author_id, status, created_at, rejection_note, attachments(attachment_details(file_path))',
+          )
+          .eq('post_id', postId)
+          .maybeSingle();
+
+      if (row == null) {
+        return null;
+      }
+
+      final map = Map<String, dynamic>.from(row as Map);
+      final cachedPost = _buildCachedPost(map);
+      if (cachedPost != null) {
+        await _cachedPostsBox.put(cachedPost.postId, cachedPost);
+      }
+      return cachedPost;
+    } catch (e) {
+      debugPrint('Failed to fetch/cache post $postId: $e');
+      return null;
+    }
+  }
+
+  Future<List<CachedPost>> _fetchAndCachePostsByIds(
+    List<String> postIds,
+  ) async {
+    final uniquePostIds = postIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (uniquePostIds.isEmpty) {
+      return <CachedPost>[];
+    }
+
+    final supabase = Supabase.instance.client;
+    try {
+      final rows = await supabase
+          .from('posts')
+          .select(
+            'post_id, title, content, author_id, status, created_at, rejection_note, attachments(attachment_details(file_path))',
+          )
+          .inFilter('post_id', uniquePostIds);
+
+      final List<CachedPost> cachedPosts = [];
+      for (final row in rows as List) {
+        final map = Map<String, dynamic>.from(row as Map);
+        final cachedPost = _buildCachedPost(map);
+        if (cachedPost == null) {
+          continue;
+        }
+        await _cachedPostsBox.put(cachedPost.postId, cachedPost);
+        cachedPosts.add(cachedPost);
+      }
+      return cachedPosts;
+    } catch (e) {
+      debugPrint('Failed to fetch/cache bookmarked posts: $e');
+      return <CachedPost>[];
+    }
+  }
 
   Future<LocalDraft> saveDraft(
     String? title,
@@ -325,6 +446,147 @@ class PostController {
 
   List<CachedPost> getOfflinePosts() {
     return _cachedPostsBox.values.toList(growable: false);
+  }
+
+  Future<void> toggleBookmark(String postId) async {
+    final userId = _currentUserId;
+    if (userId == null || postId.trim().isEmpty) {
+      debugPrint('toggleBookmark skipped: missing user or post id.');
+      return;
+    }
+
+    final existingEntry = _bookmarkBox.values.cast<LocalBookmark?>().firstWhere(
+      (bookmark) =>
+          bookmark != null &&
+          bookmark.userId == userId &&
+          bookmark.postId == postId,
+      orElse: () => null,
+    );
+
+    final supabase = Supabase.instance.client;
+
+    if (existingEntry != null) {
+      try {
+        await supabase
+            .from('bookmarks')
+            .delete()
+            .eq('user_id', userId)
+            .eq('post_id', postId);
+      } catch (e) {
+        debugPrint('Failed to delete remote bookmark for $postId: $e');
+      }
+
+      await _bookmarkBox.delete(existingEntry.bookmarkId);
+      return;
+    }
+
+    String bookmarkId = _uuid.v4();
+    try {
+      final inserted = await supabase
+          .from('bookmarks')
+          .insert({'user_id': userId, 'post_id': postId})
+          .select('bookmark_id')
+          .maybeSingle();
+
+      if (inserted != null) {
+        final map = Map<String, dynamic>.from(inserted as Map);
+        bookmarkId = (map['bookmark_id'] ?? bookmarkId).toString();
+      }
+    } catch (e) {
+      debugPrint('Failed to insert remote bookmark for $postId: $e');
+    }
+
+    final bookmark = LocalBookmark(
+      bookmarkId: bookmarkId,
+      postId: postId,
+      userId: userId,
+      isSynced: true,
+    );
+    await _bookmarkBox.put(bookmark.bookmarkId, bookmark);
+
+    if (!_cachedPostsBox.containsKey(postId)) {
+      await _fetchAndCachePostById(postId);
+    }
+  }
+
+  Future<void> syncBookmarks() async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      debugPrint('syncBookmarks skipped: missing current user.');
+      return;
+    }
+
+    final supabase = Supabase.instance.client;
+    try {
+      final rows = await supabase
+          .from('bookmarks')
+          .select('bookmark_id, post_id, user_id')
+          .eq('user_id', userId);
+
+      final remoteBookmarks = <LocalBookmark>[];
+      final bookmarkedPostIds = <String>[];
+
+      for (final row in rows as List) {
+        final map = Map<String, dynamic>.from(row as Map);
+        final bookmarkId = (map['bookmark_id'] ?? '').toString();
+        final postId = (map['post_id'] ?? '').toString();
+        final bookmarkUserId = (map['user_id'] ?? '').toString();
+
+        if (bookmarkId.isEmpty || postId.isEmpty || bookmarkUserId.isEmpty) {
+          continue;
+        }
+
+        remoteBookmarks.add(
+          LocalBookmark(
+            bookmarkId: bookmarkId,
+            postId: postId,
+            userId: bookmarkUserId,
+            isSynced: true,
+          ),
+        );
+        bookmarkedPostIds.add(postId);
+      }
+
+      final localKeysToRemove = _bookmarkBox.keys
+          .where((key) {
+            final value = _bookmarkBox.get(key);
+            return value != null && value.userId == userId;
+          })
+          .toList(growable: false);
+
+      for (final key in localKeysToRemove) {
+        await _bookmarkBox.delete(key);
+      }
+
+      for (final bookmark in remoteBookmarks) {
+        await _bookmarkBox.put(bookmark.bookmarkId, bookmark);
+      }
+
+      await _fetchAndCachePostsByIds(bookmarkedPostIds);
+    } catch (e) {
+      debugPrint('Failed to sync bookmarks: $e');
+    }
+  }
+
+  List<CachedPost> getOfflineBookmarks() {
+    final userId = _currentUserId;
+    if (userId == null) {
+      return <CachedPost>[];
+    }
+
+    final bookmarkedPostIds = _bookmarkBox.values
+        .where((bookmark) => bookmark.userId == userId)
+        .map((bookmark) => bookmark.postId)
+        .toSet();
+
+    if (bookmarkedPostIds.isEmpty) {
+      return <CachedPost>[];
+    }
+
+    return bookmarkedPostIds
+        .map(_cachedPostsBox.get)
+        .whereType<CachedPost>()
+        .toList(growable: false);
   }
 
   Future<List<CachedPost>> fetchFeed() async {

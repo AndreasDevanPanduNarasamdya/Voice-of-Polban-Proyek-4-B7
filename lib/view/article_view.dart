@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/cached_post.dart';
 import '../models/cached_user.dart';
+import '../models/local_bookmark.dart';
 import '../auth/auth_controller.dart';
+import '../controller/post_controller.dart';
 
 class ArticlePage extends StatefulWidget {
   final String articleId;
@@ -16,6 +18,8 @@ class ArticlePage extends StatefulWidget {
 
 class _ArticlePageState extends State<ArticlePage> {
   CachedPost? _post;
+  final AuthController _authController = AuthController();
+  final PostController _postController = PostController();
   final PageController _pageController = PageController();
   int _currentPage = 0;
   double _galleryHeight = 250;
@@ -86,7 +90,7 @@ class _ArticlePageState extends State<ArticlePage> {
 
   @override
   Widget build(BuildContext context) {
-    final myAvatarUrl = AuthController().currentUser?.avatarUrl ?? '';
+    final myAvatarUrl = _authController.currentUser?.avatarUrl ?? '';
 
     if (_post == null) {
       return Scaffold(
@@ -273,7 +277,7 @@ class _ArticlePageState extends State<ArticlePage> {
                       color: const Color(0xFF1E1E1E),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
                         Icon(
                           Icons.arrow_upward,
@@ -305,10 +309,38 @@ class _ArticlePageState extends State<ArticlePage> {
                           ),
                         ),
                         SizedBox(width: 12),
-                        Icon(
-                          Icons.bookmark_border,
-                          color: Colors.grey,
-                          size: 16,
+                        ValueListenableBuilder<Box<LocalBookmark>>(
+                          valueListenable: Hive.box<LocalBookmark>(
+                            'local_bookmark_box',
+                          ).listenable(),
+                          builder: (context, bookmarkBox, _) {
+                            final userId = _authController.currentUser?.userId;
+                            final isBookmarked =
+                                userId != null &&
+                                bookmarkBox.values.any(
+                                  (bookmark) =>
+                                      bookmark.userId == userId &&
+                                      bookmark.postId == widget.articleId,
+                                );
+
+                            return IconButton(
+                              constraints: const BoxConstraints(),
+                              padding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => _postController.toggleBookmark(
+                                widget.articleId,
+                              ),
+                              icon: Icon(
+                                isBookmarked
+                                    ? Icons.bookmark
+                                    : Icons.bookmark_border,
+                                color: isBookmarked
+                                    ? const Color(0xFFFF8C00)
+                                    : Colors.grey,
+                                size: 16,
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
