@@ -122,19 +122,19 @@ class _HomePageState extends State<HomePage> {
             },
           ),
 
-          bottomNavigationBar: Container(
-            color: const Color(0xFF121212),
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildNavItem(Icons.emoji_events_outlined, "Akademik", 0),
-                _buildNavItem(Icons.school_outlined, "Kampus", 1),
-                _buildNavItem(Icons.calendar_today_outlined, "Acara", 2),
-                _buildNavItem(Icons.people_outline, "Organisasi", 3),
-              ],
-            ),
-          ),
+          // bottomNavigationBar: Container(
+          //   color: const Color(0xFF121212),
+          //   padding: const EdgeInsets.symmetric(vertical: 8),
+          //   child: Row(
+          //     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          //     children: [
+          //       _buildNavItem(Icons.emoji_events_outlined, "Akademik", 0),
+          //       _buildNavItem(Icons.school_outlined, "Kampus", 1),
+          //       _buildNavItem(Icons.calendar_today_outlined, "Acara", 2),
+          //       _buildNavItem(Icons.people_outline, "Organisasi", 3),
+          //     ],
+          //   ),
+          // ),
         );
       },
     );
