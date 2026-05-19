@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../models/app_enums.dart';
 import '../models/cached_post.dart';
 import '../models/local_bookmark.dart';
+import '../models/local_vote.dart';
 import '../models/local_draft.dart';
 import '../models/sync_queue.dart';
 
@@ -16,6 +17,7 @@ class PostController {
   static const String _draftBoxName = 'local_draft_box';
   static const String _cachedPostsBoxName = 'cached_post_box';
   static const String _bookmarkBoxName = 'local_bookmark_box';
+  static const String _voteBoxName = 'local_vote_box';
   static const String _queueBoxName = 'sync_queue_box';
 
   final Uuid _uuid = const Uuid();
@@ -25,9 +27,25 @@ class PostController {
       Hive.box<CachedPost>(_cachedPostsBoxName);
   Box<LocalBookmark> get _bookmarkBox =>
       Hive.box<LocalBookmark>(_bookmarkBoxName);
+  Box<LocalVote> get _voteBox => Hive.box<LocalVote>(_voteBoxName);
   Box<SyncQueue> get _queueBox => Hive.box<SyncQueue>(_queueBoxName);
 
-  String? get _currentUserId => Supabase.instance.client.auth.currentUser?.id;
+  String? get _currentUserId {
+    // Prefer the local session stored by AuthController in Hive ('session_box').
+    // This avoids mismatch between local session and Supabase client auth.
+    try {
+      final sessionBox = Hive.box('session_box');
+      final userId = sessionBox.get('logged_in_user_id');
+      if (userId == null) {
+        // Fallback to Supabase auth if no local session available.
+        return Supabase.instance.client.auth.currentUser?.id;
+      }
+      return userId.toString();
+    } catch (_) {
+      // If Hive isn't ready or box missing, fallback to Supabase auth.
+      return Supabase.instance.client.auth.currentUser?.id;
+    }
+  }
 
   List<String> _extractImageUrls(Map<String, dynamic> map) {
     final attachments = map['attachments'] as List<dynamic>?;
@@ -566,6 +584,152 @@ class PostController {
     } catch (e) {
       debugPrint('Failed to sync bookmarks: $e');
     }
+  }
+
+  Future<void> castVote({
+    required String postId,
+    required bool isUpvoteTarget,
+  }) async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      throw Exception('Guests cannot vote. Please sign in first.');
+    }
+
+    final trimmedPostId = postId.trim();
+    if (trimmedPostId.isEmpty) {
+      throw ArgumentError('postId cannot be empty.');
+    }
+
+    final existingLocalVote = _voteBox.values.cast<LocalVote?>().firstWhere(
+      (vote) =>
+          vote != null && vote.userId == userId && vote.postId == trimmedPostId,
+      orElse: () => null,
+    );
+
+    final supabase = Supabase.instance.client;
+
+    // Case A: click the same vote again -> retract vote.
+    if (existingLocalVote != null &&
+        existingLocalVote.upvoteStatus == isUpvoteTarget) {
+      try {
+        await supabase
+            .from('votes')
+            .delete()
+            .eq('vote_id', existingLocalVote.voteId);
+      } catch (_) {
+        // Fallback for stale local vote_id.
+        await supabase
+            .from('votes')
+            .delete()
+            .eq('user_id', userId)
+            .eq('post_id', trimmedPostId);
+      }
+
+      await _voteBox.delete(existingLocalVote.voteId);
+      await _refreshCachedPostVoteState(postId: trimmedPostId, userId: userId);
+      return;
+    }
+
+    // Case B: no prior vote -> insert fresh row.
+    if (existingLocalVote == null) {
+      String voteId = _uuid.v4();
+      try {
+        final inserted = await supabase
+            .from('votes')
+            .insert({
+              'post_id': trimmedPostId,
+              'user_id': userId,
+              'upvote_status': isUpvoteTarget,
+            })
+            .select('vote_id')
+            .maybeSingle();
+
+        if (inserted != null) {
+          final map = Map<String, dynamic>.from(inserted as Map);
+          final insertedVoteId = map['vote_id']?.toString();
+          if (insertedVoteId != null && insertedVoteId.isNotEmpty) {
+            voteId = insertedVoteId;
+          }
+        }
+      } catch (e) {
+        debugPrint('Failed to insert vote for $trimmedPostId: $e');
+        rethrow;
+      }
+
+      final newLocalVote = LocalVote(
+        voteId: voteId,
+        postId: trimmedPostId,
+        userId: userId,
+        upvoteStatus: isUpvoteTarget,
+        isSynced: true,
+      );
+      await _voteBox.put(newLocalVote.voteId, newLocalVote);
+      await _refreshCachedPostVoteState(postId: trimmedPostId, userId: userId);
+      return;
+    }
+
+    // Case C: switch vote target -> update existing row.
+    try {
+      await supabase
+          .from('votes')
+          .update({'upvote_status': isUpvoteTarget})
+          .eq('vote_id', existingLocalVote.voteId);
+    } catch (_) {
+      // Fallback for stale local vote_id.
+      await supabase
+          .from('votes')
+          .update({'upvote_status': isUpvoteTarget})
+          .eq('user_id', userId)
+          .eq('post_id', trimmedPostId);
+    }
+
+    existingLocalVote.upvoteStatus = isUpvoteTarget;
+    existingLocalVote.isSynced = true;
+    await _voteBox.put(existingLocalVote.voteId, existingLocalVote);
+
+    await _refreshCachedPostVoteState(postId: trimmedPostId, userId: userId);
+  }
+
+  Future<void> _refreshCachedPostVoteState({
+    required String postId,
+    required String userId,
+  }) async {
+    final cachedPost = _cachedPostsBox.get(postId);
+    if (cachedPost == null) {
+      return;
+    }
+
+    int upvoteCount;
+    try {
+      final count = await Supabase.instance.client
+          .from('votes')
+          .count(CountOption.exact)
+          .eq('post_id', postId)
+          .eq('upvote_status', true);
+      upvoteCount = count;
+    } catch (e) {
+      debugPrint('Failed to fetch remote upvote count for $postId: $e');
+      // Fallback: local best-effort count from cached local votes.
+      upvoteCount = _voteBox.values
+          .where((vote) => vote.postId == postId && vote.upvoteStatus)
+          .length;
+    }
+
+    final localUserVote = _voteBox.values.cast<LocalVote?>().firstWhere(
+      (vote) => vote != null && vote.userId == userId && vote.postId == postId,
+      orElse: () => null,
+    );
+
+    final data = Map<String, dynamic>.from(
+      jsonDecode(cachedPost.cachedData) as Map,
+    );
+    data['upvote_count'] = upvoteCount;
+    data['is_upvoted_by_me'] = localUserVote?.upvoteStatus == true;
+    data['is_downvoted_by_me'] = localUserVote?.upvoteStatus == false;
+
+    cachedPost.cachedData = jsonEncode(data);
+    cachedPost.cachedAt = DateTime.now();
+    await _cachedPostsBox.put(postId, cachedPost);
   }
 
   List<CachedPost> getOfflineBookmarks() {

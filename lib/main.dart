@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-// screens/debug_dashboard.dart removed from imports (unused)
 import 'package:voice_of_polban/auth/auth_view.dart';
 import 'package:voice_of_polban/auth/auth_controller.dart'; // Added this
 import 'package:voice_of_polban/view/home_view.dart'; // Added this
@@ -50,7 +49,7 @@ class VoiceOfPolbanApp extends StatelessWidget {
       ),
 
       home: AuthController().currentUser != null
-          ? const HomePage() 
+          ? const HomePage()
           : const LoginView(),
     );
   }

@@ -23,6 +23,41 @@ class _HomePageState extends State<HomePage> {
   final PostController _controller = PostController();
   late Future<List<CachedPost>> _onlineFeed;
 
+  int _readUpvoteCount(Map<String, dynamic> parsed) {
+    final raw = parsed['upvote_count'];
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    if (raw is String) return int.tryParse(raw) ?? 0;
+    return 0;
+  }
+
+  bool _readBoolFlag(Map<String, dynamic> parsed, String key) {
+    final raw = parsed[key];
+    if (raw is bool) return raw;
+    if (raw is String) {
+      return raw.toLowerCase() == 'true';
+    }
+    return false;
+  }
+
+  Future<void> _handleVote({
+    required String postId,
+    required bool isUpvoteTarget,
+  }) async {
+    try {
+      await _controller.castVote(
+        postId: postId,
+        isUpvoteTarget: isUpvoteTarget,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -278,64 +313,98 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildInteractionPillGroup(String postId) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.arrow_upward, color: Color(0xFFFF8C00), size: 16),
-          const SizedBox(width: 4),
-          Text(
-            "300",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Icon(Icons.arrow_downward, color: Color(0xFF000080), size: 16),
-          const SizedBox(width: 4),
-          Text(
-            "300",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(width: 8),
-          ValueListenableBuilder<Box<LocalBookmark>>(
-            valueListenable: Hive.box<LocalBookmark>(
-              'local_bookmark_box',
-            ).listenable(),
-            builder: (context, bookmarkBox, _) {
-              final userId = _authController.currentUser?.userId;
-              final isBookmarked =
-                  userId != null &&
-                  bookmarkBox.values.any(
-                    (bookmark) =>
-                        bookmark.userId == userId && bookmark.postId == postId,
-                  );
+    return ValueListenableBuilder<Box<CachedPost>>(
+      valueListenable: Hive.box<CachedPost>('cached_post_box').listenable(),
+      builder: (context, postBox, _) {
+        final livePost = postBox.get(postId);
+        final parsed = livePost == null
+            ? <String, dynamic>{}
+            : Map<String, dynamic>.from(jsonDecode(livePost.cachedData) as Map);
 
-              return IconButton(
+        final upvoteCount = _readUpvoteCount(parsed);
+        final isUpvotedByMe = _readBoolFlag(parsed, 'is_upvoted_by_me');
+        final isDownvotedByMe = _readBoolFlag(parsed, 'is_downvoted_by_me');
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            children: [
+              IconButton(
                 constraints: const BoxConstraints(),
                 padding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
-                onPressed: () => _controller.toggleBookmark(postId),
+                onPressed: () =>
+                    _handleVote(postId: postId, isUpvoteTarget: true),
                 icon: Icon(
-                  isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                  color: isBookmarked ? const Color(0xFFFF8C00) : Colors.grey,
-                  size: 16,
+                  isUpvotedByMe ? Icons.arrow_circle_up : Icons.arrow_upward,
+                  color: isUpvotedByMe ? const Color(0xFFFF8C00) : Colors.grey,
+                  size: 18,
                 ),
-              );
-            },
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '$upvoteCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 10),
+              IconButton(
+                constraints: const BoxConstraints(),
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                onPressed: () =>
+                    _handleVote(postId: postId, isUpvoteTarget: false),
+                icon: Icon(
+                  isDownvotedByMe
+                      ? Icons.arrow_circle_down
+                      : Icons.arrow_downward,
+                  color: isDownvotedByMe
+                      ? const Color(0xFF2E5BFF)
+                      : Colors.grey,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 8),
+              ValueListenableBuilder<Box<LocalBookmark>>(
+                valueListenable: Hive.box<LocalBookmark>(
+                  'local_bookmark_box',
+                ).listenable(),
+                builder: (context, bookmarkBox, _) {
+                  final userId = _authController.currentUser?.userId;
+                  final isBookmarked =
+                      userId != null &&
+                      bookmarkBox.values.any(
+                        (bookmark) =>
+                            bookmark.userId == userId &&
+                            bookmark.postId == postId,
+                      );
+
+                  return IconButton(
+                    constraints: const BoxConstraints(),
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => _controller.toggleBookmark(postId),
+                    icon: Icon(
+                      isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                      color: isBookmarked
+                          ? const Color(0xFFFF8C00)
+                          : Colors.grey,
+                      size: 16,
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
