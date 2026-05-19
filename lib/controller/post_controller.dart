@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/app_enums.dart';
 import '../models/cached_post.dart';
+import '../models/comment_model.dart';
 import '../models/local_bookmark.dart';
 import '../models/local_vote.dart';
 import '../models/local_draft.dart';
@@ -584,6 +585,53 @@ class PostController {
     } catch (e) {
       debugPrint('Failed to sync bookmarks: $e');
     }
+  }
+
+  Future<List<CommentModel>> fetchComments(String postId) async {
+    final trimmedPostId = postId.trim();
+    if (trimmedPostId.isEmpty) {
+      return <CommentModel>[];
+    }
+
+    try {
+      final rows = await Supabase.instance.client
+          .from('comments')
+          .select('*, users(name)')
+          .eq('post_id', trimmedPostId)
+          .order('created_at', ascending: false);
+
+      return (rows as List)
+          .map((row) => CommentModel.fromJson(Map<String, dynamic>.from(row)))
+          .toList(growable: false);
+    } catch (e) {
+      debugPrint('Failed to fetch comments for $trimmedPostId: $e');
+      return <CommentModel>[];
+    }
+  }
+
+  Future<void> addComment({
+    required String postId,
+    required String content,
+  }) async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      throw Exception('Guests cannot comment. Please sign in first.');
+    }
+
+    final trimmedPostId = postId.trim();
+    final trimmedContent = content.trim();
+    if (trimmedPostId.isEmpty) {
+      throw ArgumentError('postId cannot be empty.');
+    }
+    if (trimmedContent.isEmpty) {
+      throw ArgumentError('content cannot be empty.');
+    }
+
+    await Supabase.instance.client.from('comments').insert({
+      'post_id': trimmedPostId,
+      'user_id': userId,
+      'content': trimmedContent,
+    });
   }
 
   Future<void> castVote({
