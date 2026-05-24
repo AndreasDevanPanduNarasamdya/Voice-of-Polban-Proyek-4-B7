@@ -980,11 +980,11 @@ class PostController {
     }
   }
 
-  Future<bool> approvePost(String postId) async {
+  Future<bool> approvePost(String postId, {String note = ''}) async {
     try {
       await Supabase.instance.client
           .from('posts')
-          .update({'status': PostStatus.published.name})
+          .update({'status': PostStatus.published.name,'rejection_note': note,})
           .eq('post_id', postId);
 
       final cachedPost = _cachedPostsBox.get(postId);

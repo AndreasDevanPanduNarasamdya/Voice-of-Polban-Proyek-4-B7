@@ -332,7 +332,7 @@ class _DraftCardState extends State<_DraftCard> {
             ),
 
             // ── Rejection comment box ──
-            if (article.status == PostStatus.rejected &&
+            if ((article.status == PostStatus.rejected || article.status == PostStatus.published) &&
                 article.rejectionNote != null &&
                 article.rejectionNote!.isNotEmpty) ...[
               const SizedBox(height: 10),

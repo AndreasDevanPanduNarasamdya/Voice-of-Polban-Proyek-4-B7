@@ -125,7 +125,8 @@ class _EditorPageState extends State<EditorPage> {
                     try {
                       if (isApprove) {
                         // 2. Call approvePost from your controller
-                        success = await _controller.approvePost(post.postId);
+                        // success = await _controller.approvePost(post.postId);
+                        success = await _controller.approvePost(post.postId, note: noteController.text);
                       } else {
                         // 3. Call rejectPost and pass the note from the text field
                         // Ensure your controller's rejectPost accepts a 'note' parameter
@@ -179,14 +180,79 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
-  // Handles the "Drop" (Delete) action
+// Handles the "Drop" (Delete) action
   void _dropPost(CachedPost post) {
-    Hive.box<CachedPost>('cached_post_box').delete(post.postId);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Artikel di-drop (dihapus)."),
-        backgroundColor: Colors.red,
-      ),
+    final TextEditingController noteController = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: const Text(
+            "Drop Artikel",
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Masukkan catatan mengapa artikel di-drop:",
+                style: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteController,
+                style: const TextStyle(color: Colors.white),
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: "Tulis catatan drop...",
+                  hintStyle: const TextStyle(color: Colors.grey),
+                  filled: true,
+                  fillColor: const Color(0xFF121212),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                "Batal",
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+              onPressed: () {
+                // --- KODE ASLI ANDA ---
+                Hive.box<CachedPost>('cached_post_box').delete(post.postId);
+                
+                Navigator.pop(context); // Tutup pop-up
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Artikel di-drop (dihapus)."),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                // ----------------------
+              },
+              child: const Text(
+                "Drop",
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
