@@ -5,6 +5,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/cached_post.dart';
 import '../models/cached_user.dart';
 import '../models/local_bookmark.dart';
+import '../models/comment_model.dart';
 import '../auth/auth_controller.dart';
 import '../controller/post_controller.dart';
 
@@ -21,6 +22,13 @@ class _ArticlePageState extends State<ArticlePage> {
   final AuthController _authController = AuthController();
   final PostController _postController = PostController();
   final PageController _pageController = PageController();
+  
+  // Controller dan State untuk fitur komentar
+  final TextEditingController _commentController = TextEditingController();
+  List<CommentModel> _comments = [];
+  bool _isLoadingComments = true;
+  bool _isSubmittingComment = false;
+
   int _currentPage = 0;
   double _galleryHeight = 250;
 
@@ -56,9 +64,56 @@ class _ArticlePageState extends State<ArticlePage> {
     }
   }
 
+  // Fungsi untuk mengambil komentar dari Supabase
+  Future<void> _loadComments() async {
+    if (!mounted) return;
+    setState(() => _isLoadingComments = true);
+    
+    try {
+      final comments = await _postController.fetchComments(widget.articleId);
+      if (mounted) {
+        setState(() {
+          _comments = comments;
+          _isLoadingComments = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingComments = false);
+      debugPrint("Gagal memuat komentar: $e");
+    }
+  }
+
+  // Fungsi untuk mengirim komentar baru
+  Future<void> _submitComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _isSubmittingComment = true);
+    try {
+      await _postController.addComment(
+        postId: widget.articleId, 
+        content: text
+      );
+      
+      _commentController.clear();
+      FocusScope.of(context).unfocus(); // Menutup keyboard
+      
+      // Muat ulang komentar untuk menampilkan komentar yang baru dikirim
+      await _loadComments();
+    } catch (e) {
+      final message = e.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message))
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmittingComment = false);
+    }
+  }
+
   @override
   void dispose() {
     _pageController.dispose();
+    _commentController.dispose();
     super.dispose();
   }
 
@@ -84,6 +139,7 @@ class _ArticlePageState extends State<ArticlePage> {
   @override
   void initState() {
     super.initState();
+    _loadComments(); // Panggil fetch comments saat halaman dimuat
     _post = Hive.box<CachedPost>('cached_post_box').get(widget.articleId);
     if (_post != null) {
       final parsed = jsonDecode(_post!.cachedData) as Map<String, dynamic>;
@@ -216,7 +272,7 @@ class _ArticlePageState extends State<ArticlePage> {
             ),
             const SizedBox(height: 16),
 
-            // Image gallery — natural ratio + dot indicators
+            // Image gallery
             if (parsed['imageUrls'] != null &&
                 (parsed['imageUrls'] as List).isNotEmpty)
               Builder(
@@ -419,36 +475,73 @@ class _ArticlePageState extends State<ArticlePage> {
             ),
             const Divider(color: Color(0xFF333333)),
 
-            // Comment Input
+            // Comment Input Section
             Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E1E1E),
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Row(
-                  children: [
-                    _buildAvatar(myAvatarUrl, 12),
-                    const SizedBox(width: 12),
-                    const Text(
-                      "Tulis Komentar",
-                      style: TextStyle(
-                        color: Color(0xFFFF8C00),
-                        fontWeight: FontWeight.w500,
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  _buildAvatar(myAvatarUrl, 18),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _commentController,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Tulis Komentar...',
+                        hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+                        filled: true,
+                        fillColor: const Color(0xFF1E1E1E),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(30.0),
+                          borderSide: BorderSide.none,
+                        ),
                       ),
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _submitComment(),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  _isSubmittingComment
+                      ? const Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: SizedBox(
+                            width: 24, height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF8C00)),
+                          ),
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.send, color: Color(0xFFFF8C00)),
+                          onPressed: _submitComment,
+                        ),
+                ],
               ),
             ),
+            const SizedBox(height: 16),
 
-            _buildDummyComment("Richard Joe", "🔥🔥🔥"),
-            _buildDummyComment("Christie Lee", "🔥🔥🔥"),
+            // Dynamic Comments List
+            _isLoadingComments 
+                ? const Center(child: Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: CircularProgressIndicator(color: Color(0xFFFF8C00)),
+                  ))
+                : _comments.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Text("Belum ada komentar. Jadilah yang pertama!", 
+                          style: TextStyle(color: Colors.grey),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(), // Agar scroll mengikuti SingleChildScrollView
+                        itemCount: _comments.length,
+                        itemBuilder: (context, index) {
+                          return _buildCommentItem(_comments[index]);
+                        },
+                      ),
+                      
             const SizedBox(height: 30),
           ],
         ),
@@ -456,45 +549,52 @@ class _ArticlePageState extends State<ArticlePage> {
     );
   }
 
-  Widget _buildDummyComment(String name, String comment) {
+  // Widget dinamis untuk setiap item komentar
+  Widget _buildCommentItem(CommentModel comment) {
+    // Format tanggal
+    final formattedDate = DateFormat('dd MMM yyyy, HH:mm').format(comment.createdAt);
+    final displayName = comment.authorName.isNotEmpty ? comment.authorName : "User";
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Dummy commenters keep placeholder since we don't have their data
           CircleAvatar(
             radius: 14,
             backgroundColor: Colors.grey[700],
             child: const Icon(Icons.person, color: Colors.white70, size: 14),
           ),
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    "31 Agustus 2025",
-                    style: TextStyle(color: Colors.grey, fontSize: 10),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                comment,
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-              ),
-            ],
+                    const SizedBox(width: 8),
+                    Text(
+                      formattedDate,
+                      style: const TextStyle(color: Colors.grey, fontSize: 10),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  comment.content,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ],
+            ),
           ),
         ],
       ),
