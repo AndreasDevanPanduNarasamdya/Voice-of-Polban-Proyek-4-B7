@@ -1,15 +1,23 @@
-import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:intl/intl.dart'; // Used for formatting real dates
-import '../models/cached_post.dart';
-import '../models/cached_user.dart';
-import '../models/local_bookmark.dart';
-import '../models/app_enums.dart';
-import '../controller/post_controller.dart';
-import '../auth/auth_controller.dart';
-import 'package:voice_of_polban/view/sidebar.dart';
-import 'article_view.dart';
+import 'package:intl/intl.dart';
+import '../../processing/sync_worker.dart';
+// Storage Layer (Models)
+import '../../storage/cached_post.dart';
+import '../../storage/cached_user.dart';
+import '../../storage/local_bookmark.dart';
+
+// Config Layer
+import '../../config/app_enums.dart';
+
+// Processing Layer (State Managers)
+import '../../processing/auth_controller.dart'; // Updated path
+import '../../processing/feed_controller.dart'; // Replaces post_controller.dart
+
+// UI Layer (Widgets & Other Screens)
+import '../widgets/sidebar.dart';
+import 'post_view.dart'; // Ensure post_view.dart is renamed to article_view.dart to match the architecture
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,7 +28,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final AuthController _authController = AuthController();
-  final PostController _controller = PostController();
+  final FeedController _controller = FeedController();
   late Future<List<CachedPost>> _onlineFeed;
 
   int _readUpvoteCount(Map<String, dynamic> parsed) {
@@ -62,7 +70,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _onlineFeed = _controller.fetchFeed();
-    _controller.processSyncQueue();
+    SyncWorker().processSyncQueue();
   }
 
   Future<void> _refreshFeed() async {

@@ -1,5 +1,4 @@
 import 'package:hive/hive.dart';
-
 part 'app_enums.g.dart';
 
 @HiveType(typeId: 8)

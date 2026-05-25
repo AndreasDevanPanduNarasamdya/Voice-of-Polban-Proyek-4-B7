@@ -21,7 +21,7 @@ class CachedUserAdapter extends TypeAdapter<CachedUser> {
       name: fields[1] as String,
       email: fields[2] as String,
       role: fields[3] as UserRole,
-      avatarUrl: fields[4] as String,
+      avatarUrl: fields[4] as String?,
     );
   }
 

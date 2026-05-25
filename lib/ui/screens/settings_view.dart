@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../models/app_enums.dart';
-import '../auth/auth_controller.dart';
-import '../auth/auth_view.dart';
+
+// Config Layer
+import '../../config/app_enums.dart';
+
+// Processing Layer
+import '../../processing/auth_controller.dart';
+
+// UI Layer
+import 'login_view.dart'; // Replaced the old auth_view.dart
 
 class SettingsPage extends StatefulWidget {
   final String userName;

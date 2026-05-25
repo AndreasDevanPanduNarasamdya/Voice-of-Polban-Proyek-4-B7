@@ -1,13 +1,19 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'dart:io';
+
+// Config & Storage Layer
 import 'package:hive_flutter/hive_flutter.dart';
-import '../models/app_enums.dart';
-import '../models/cached_user.dart';
-import '../models/local_draft.dart';
-import '../auth/auth_controller.dart';
-import '../controller/post_controller.dart';
+import '../../config/app_enums.dart';
+import '../../storage/local_draft.dart';
+import '../../storage/cached_user.dart';
+
+// Processing Layer
+import '../../processing/studio_controller.dart';
+import '../../processing/auth_controller.dart';
+
+// UI Layer
 import 'writer_view.dart';
-import 'article_view.dart';
+import 'post_view.dart';
 
 class DraftPage extends StatefulWidget {
   const DraftPage({super.key});
@@ -21,19 +27,18 @@ class _DraftPageState extends State<DraftPage> {
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final AuthController _authController = AuthController();
-  late final PostController _articleController;
+  final StudioController _studioController = StudioController();
 
   @override
   void initState() {
     super.initState();
-    _articleController = PostController();
-    _syncDrafts(); // Add this line
+    _syncDrafts();
   }
 
   Future<void> _syncDrafts() async {
     final userId = _authController.currentUser?.userId;
     if (userId != null) {
-      await _articleController.syncMyArticles(userId);
+      await _studioController.syncMyArticles(userId);
     }
   }
 
@@ -116,7 +121,6 @@ class _DraftPageState extends State<DraftPage> {
             padding: const EdgeInsets.only(right: 14),
             child: Builder(
               builder: (context) {
-                // [CHANGED: Uses the real avatarUrl from Hive instead of pravatar.cc]
                 final avatarUrl = _authController.currentUser?.avatarUrl ?? '';
                 return CircleAvatar(
                   radius: 18,
@@ -159,10 +163,9 @@ class _DraftPageState extends State<DraftPage> {
           return RefreshIndicator(
             color: const Color(0xFFFF6D00),
             backgroundColor: const Color(0xFF1E1E1E),
-            onRefresh: _syncDrafts, // Triggers the Supabase fetch
+            onRefresh: _syncDrafts,
             child: ListView.builder(
-              physics:
-                  const AlwaysScrollableScrollPhysics(), // Required for pull-to-refresh
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.only(top: 4, bottom: 24),
               itemCount: articles.length,
               itemBuilder: (ctx, i) {
@@ -171,7 +174,7 @@ class _DraftPageState extends State<DraftPage> {
                   article: draft,
                   authorName: _getAuthorName(draft.userId),
                   dateStr: _formatDate(draft.updatedAt),
-                  controller: _articleController,
+                  controller: _studioController,
                 );
               },
             ),
@@ -186,7 +189,7 @@ class _DraftCard extends StatefulWidget {
   final LocalDraft article;
   final String authorName;
   final String dateStr;
-  final PostController controller;
+  final StudioController controller;
 
   const _DraftCard({
     required this.article,
@@ -214,7 +217,6 @@ class _DraftCardState extends State<_DraftCard> {
         article.status == PostStatus.archived;
 
     return GestureDetector(
-      // Tapping the card navigates to article page
       onTap: () {
         Navigator.push(
           context,
@@ -233,14 +235,11 @@ class _DraftCardState extends State<_DraftCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Date row ──
             Text(
               widget.dateStr,
               style: const TextStyle(color: Colors.white38, fontSize: 12),
             ),
             const SizedBox(height: 8),
-
-            // ── Title ──
             Text(
               article.title,
               style: TextStyle(
@@ -250,8 +249,6 @@ class _DraftCardState extends State<_DraftCard> {
               ),
             ),
             const SizedBox(height: 10),
-
-            // ── Expand / Collapse image button ──
             GestureDetector(
               onTap: () => setState(() => _expanded = !_expanded),
               child: Row(
@@ -272,8 +269,6 @@ class _DraftCardState extends State<_DraftCard> {
                 ],
               ),
             ),
-
-            // ── Expanded image area ──
             AnimatedCrossFade(
               duration: const Duration(milliseconds: 250),
               crossFadeState: _expanded
@@ -297,13 +292,15 @@ class _DraftCardState extends State<_DraftCard> {
                                 ? Image.network(
                                     imgPath,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (error, stackTrace, details) => const Center(
-                                      child: Icon(
-                                        Icons.broken_image,
-                                        color: Colors.white24,
-                                        size: 40,
-                                      ),
-                                    ),
+                                    errorBuilder:
+                                        (error, stackTrace, details) =>
+                                            const Center(
+                                              child: Icon(
+                                                Icons.broken_image,
+                                                color: Colors.white24,
+                                                size: 40,
+                                              ),
+                                            ),
                                   )
                                 : Image.file(File(imgPath), fit: BoxFit.cover),
                           ),
@@ -330,9 +327,8 @@ class _DraftCardState extends State<_DraftCard> {
               ),
               secondChild: const SizedBox.shrink(),
             ),
-
-            // ── Rejection comment box ──
-            if ((article.status == PostStatus.rejected || article.status == PostStatus.published) &&
+            if ((article.status == PostStatus.rejected ||
+                    article.status == PostStatus.published) &&
                 article.rejectionNote != null &&
                 article.rejectionNote!.isNotEmpty) ...[
               const SizedBox(height: 10),
@@ -363,7 +359,6 @@ class _DraftCardState extends State<_DraftCard> {
                 ),
               ),
             ],
-
             const SizedBox(height: 12),
             _buildStatusRow(article),
           ],
@@ -415,7 +410,6 @@ class _DraftCardState extends State<_DraftCard> {
       case PostStatus.published:
         return Row(
           children: [
-            // Upvote pill
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(

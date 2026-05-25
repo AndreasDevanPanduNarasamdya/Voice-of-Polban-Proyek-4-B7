@@ -1,5 +1,4 @@
 import 'package:hive/hive.dart';
-
 part 'sync_queue.g.dart';
 
 @HiveType(typeId: 3)

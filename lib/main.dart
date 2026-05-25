@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:voice_of_polban/auth/auth_view.dart';
-import 'package:voice_of_polban/auth/auth_controller.dart'; // Added this
-import 'package:voice_of_polban/view/home_view.dart'; // Added this
-import 'models/hive_setup.dart';
+
+import 'processing/auth_controller.dart';
+import 'ui/screens/home_view.dart';
+import 'ui/screens/login_view.dart';
+import 'storage/hive_setup.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

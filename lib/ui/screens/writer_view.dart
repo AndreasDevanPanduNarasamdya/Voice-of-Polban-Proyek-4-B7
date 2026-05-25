@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:io';
-import 'package:image_picker/image_picker.dart';
 
-import '../auth/auth_controller.dart';
-import '../controller/post_controller.dart';
-import '../models/local_draft.dart';
+// Storage Layer
+import '../../storage/local_draft.dart';
+
+// Config Layer
+import 'package:hive_flutter/hive_flutter.dart';
+
+// Processing Layer (State Managers)
+import '../../processing/studio_controller.dart';
+import '../../processing/auth_controller.dart'; // <-- ADD THIS to fix the sidebar/user role errors
+import 'package:image_picker/image_picker.dart';
 
 class WriterPage extends StatefulWidget {
   final String? draftId; // Add this line
@@ -17,9 +22,10 @@ class WriterPage extends StatefulWidget {
 
 class _WriterPageState extends State<WriterPage> {
   final AuthController _authController = AuthController();
-  final PostController _postController = PostController();
   final ImagePicker _picker = ImagePicker();
   List<String> _selectedImages = [];
+
+  final StudioController _studioController = StudioController();
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
@@ -47,12 +53,14 @@ class _WriterPageState extends State<WriterPage> {
         _titleController.text = _draft!.title;
         _contentController.text = _draft!.content;
         if (_draft!.imageUrls != null) {
-          _selectedImages = List<String>.from(_draft!.imageUrls!); // Load offline images
+          _selectedImages = List<String>.from(
+            _draft!.imageUrls!,
+          ); // Load offline images
         }
       }
     }
   }
-  
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -64,7 +72,9 @@ class _WriterPageState extends State<WriterPage> {
 
   Future<void> _pickImages() async {
     if (_selectedImages.length >= 8) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maksimal 8 gambar!')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Maksimal 8 gambar!')));
       return;
     }
     try {
@@ -72,7 +82,8 @@ class _WriterPageState extends State<WriterPage> {
       if (images.isNotEmpty) {
         setState(() {
           for (var img in images) {
-            if (_selectedImages.length < 8 && !_selectedImages.contains(img.path)) {
+            if (_selectedImages.length < 8 &&
+                !_selectedImages.contains(img.path)) {
               _selectedImages.add(img.path);
             }
           }
@@ -115,22 +126,28 @@ class _WriterPageState extends State<WriterPage> {
     setState(() => _isSaving = true);
     try {
       LocalDraft? savedDraft;
-      
+
       // LOGIC FIX: Check if we are updating an existing draft or creating a new one
       if (_draft != null) {
-        savedDraft = await _postController.updateDraft(
-          _draft!.localId, title, content, imageUrls: _selectedImages,
+        savedDraft = await _studioController.updateDraft(
+          _draft!.localId,
+          title,
+          content,
+          imageUrls: _selectedImages,
         );
       } else {
-        savedDraft = await _postController.saveDraft(
-          title, content, userId, imageUrls: _selectedImages,
+        savedDraft = await _studioController.saveDraft(
+          title,
+          content,
+          userId,
+          imageUrls: _selectedImages,
         );
       }
 
       if (!mounted) return;
-      
+
       setState(() => _draft = savedDraft);
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Draf tersimpan!'),
@@ -162,7 +179,7 @@ class _WriterPageState extends State<WriterPage> {
 
     setState(() => _isSubmitting = true);
     try {
-      final queueEntry = await _postController.submitDraft(_draft!.localId);
+      final queueEntry = await _studioController.submitDraft(_draft!.localId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -259,20 +276,38 @@ class _WriterPageState extends State<WriterPage> {
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Gambar (${_selectedImages.length}/8)', style: const TextStyle(color: Colors.grey, fontSize: 16)),
+                        Text(
+                          'Gambar (${_selectedImages.length}/8)',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 16,
+                          ),
+                        ),
                         InkWell(
                           onTap: _pickImages,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(8)),
-                            child: const Text('Tambah', style: TextStyle(color: Color(0xFFFF8C00))),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E1E1E),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Tambah',
+                              style: TextStyle(color: Color(0xFFFF8C00)),
+                            ),
                           ),
                         ),
                       ],
@@ -291,20 +326,36 @@ class _WriterPageState extends State<WriterPage> {
                               children: [
                                 Container(
                                   margin: const EdgeInsets.only(right: 12),
-                                  width: 100, height: 100,
+                                  width: 100,
+                                  height: 100,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     image: DecorationImage(
                                       fit: BoxFit.cover,
-                                      image: isNetworkImage ? NetworkImage(imagePath) as ImageProvider : FileImage(File(imagePath)),
+                                      image: isNetworkImage
+                                          ? NetworkImage(imagePath)
+                                                as ImageProvider
+                                          : FileImage(File(imagePath)),
                                     ),
                                   ),
                                 ),
                                 Positioned(
-                                  top: 4, right: 16,
+                                  top: 4,
+                                  right: 16,
                                   child: GestureDetector(
                                     onTap: () => _removeImage(index),
-                                    child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle), child: const Icon(Icons.close, color: Colors.white, size: 14)),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        color: Colors.white,
+                                        size: 14,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -312,7 +363,7 @@ class _WriterPageState extends State<WriterPage> {
                           },
                         ),
                       ),
-                    ]
+                    ],
                   ],
                 ),
               ),
