@@ -14,6 +14,8 @@ class LocalDraft {
     required this.content,
     required this.status,
     required this.updatedAt,
+    this.rejectionNote,
+    this.imageUrls,
   });
 
   @HiveField(0)
@@ -36,4 +38,10 @@ class LocalDraft {
 
   @HiveField(6)
   DateTime updatedAt;
+
+  @HiveField(7)
+  String? rejectionNote;
+
+  @HiveField(8)
+  List<String>? imageUrls;
 }

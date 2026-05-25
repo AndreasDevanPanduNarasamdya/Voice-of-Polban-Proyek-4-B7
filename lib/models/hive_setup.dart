@@ -5,7 +5,6 @@ import 'local_draft.dart';
 import 'cached_post.dart';
 import 'sync_queue.dart';
 import 'local_vote.dart';
-import 'local_comment.dart';
 import 'local_bookmark.dart';
 import 'cached_user.dart';
 
@@ -30,9 +29,6 @@ Future<void> setupHive() async {
   if (!Hive.isAdapterRegistered(4)) {
     Hive.registerAdapter(LocalVoteAdapter());
   }
-  if (!Hive.isAdapterRegistered(5)) {
-    Hive.registerAdapter(LocalCommentAdapter());
-  }
   if (!Hive.isAdapterRegistered(6)) {
     Hive.registerAdapter(LocalBookmarkAdapter());
   }
@@ -51,9 +47,6 @@ Future<void> setupHive() async {
   }
   if (!Hive.isBoxOpen('local_vote_box')) {
     await Hive.openBox<LocalVote>('local_vote_box');
-  }
-  if (!Hive.isBoxOpen('local_comment_box')) {
-    await Hive.openBox<LocalComment>('local_comment_box');
   }
   if (!Hive.isBoxOpen('local_bookmark_box')) {
     await Hive.openBox<LocalBookmark>('local_bookmark_box');

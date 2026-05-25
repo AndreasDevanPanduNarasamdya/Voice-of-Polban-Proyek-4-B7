@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:voice_of_polban/view/writer_view.dart';
 import 'package:voice_of_polban/auth/auth_view.dart';
+import 'package:voice_of_polban/auth/auth_controller.dart';
 import 'package:voice_of_polban/view/editor_view.dart';
 import 'package:voice_of_polban/view/draft_view.dart';
 import 'package:voice_of_polban/view/settings_view.dart';
@@ -10,12 +11,16 @@ class AppSidebar extends StatelessWidget {
   final UserRole currentUserRole;
   const AppSidebar({super.key, required this.currentUserRole});
 
-  static const Color _bg  = Color(0xFF1A1A1A);
+  static const Color _bg = Color(0xFF1A1A1A);
   static const Color _card = Color(0xFF232323);
   static const Color _red = Color(0xFFE53935);
 
   @override
   Widget build(BuildContext context) {
+    final user = AuthController().currentUser;
+    final userName = user?.name ?? 'Pengguna';
+    final avatarUrl = user?.avatarUrl ?? '';
+
     return Drawer(
       backgroundColor: _bg,
       child: Column(
@@ -30,23 +35,37 @@ class AppSidebar extends StatelessWidget {
               right: 16,
               bottom: 20,
             ),
-            child: const Row(
+            child: Row(
               children: [
                 CircleAvatar(
                   radius: 28,
-                  backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
+                  backgroundImage: avatarUrl.isNotEmpty
+                      ? NetworkImage(avatarUrl)
+                      : null,
+                  child: avatarUrl.isEmpty
+                      ? const Icon(
+                          Icons.person,
+                          color: Colors.white70,
+                          size: 28,
+                        )
+                      : null,
                 ),
                 SizedBox(width: 14),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Selamat Datang,',
-                        style: TextStyle(color: Colors.white60, fontSize: 13)),
-                    Text('James McGill',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold)),
+                    Text(
+                      'Selamat Datang,',
+                      style: TextStyle(color: Colors.white60, fontSize: 13),
+                    ),
+                    Text(
+                      userName,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -56,42 +75,67 @@ class AppSidebar extends StatelessWidget {
           const SizedBox(height: 8),
 
           // ── Tersimpan ──
-          _tile(context, Icons.bookmark_border, 'Tersimpan',
-              onTap: () => Navigator.pop(context)),
+          _tile(
+            context,
+            Icons.bookmark_border,
+            'Tersimpan',
+            onTap: () => Navigator.pop(context),
+          ),
 
           // ── Tulis Post (writer only) ──
           if (currentUserRole == UserRole.writer)
-            _tile(context, Icons.edit_outlined, 'Tulis Post', onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const WriterPage()));
-            }),
+            _tile(
+              context,
+              Icons.edit_outlined,
+              'Tulis Post',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const WriterPage()),
+                );
+              },
+            ),
 
           // ── Lihat Draft: writer → DraftPage, editor → EditorPage ──
-          _tile(context, Icons.inbox_outlined, 'Lihat Draft', onTap: () {
-            Navigator.pop(context);
-            if (currentUserRole == UserRole.editor) {
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const EditorPage()));
-            } else {
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const DraftPage()));
-            }
-          }),
+          if (currentUserRole == UserRole.writer ||
+              currentUserRole == UserRole.editor)
+            _tile(
+              context,
+              Icons.inbox_outlined,
+              'Lihat Draft',
+              onTap: () {
+                Navigator.pop(context);
+                if (currentUserRole == UserRole.editor) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const EditorPage()),
+                  );
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const DraftPage()),
+                  );
+                }
+              },
+            ),
 
           // ── Pengaturan ──
-          _tile(context, Icons.settings_outlined, 'Pengaturan', onTap: () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SettingsPage(
-                  userName: 'James McGill',
-                  role: currentUserRole,
+          _tile(
+            context,
+            Icons.settings_outlined,
+            'Pengaturan',
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      SettingsPage(userName: userName, role: currentUserRole),
                 ),
-              ),
-            );
-          }),
+              );
+            },
+          ),
 
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -99,14 +143,24 @@ class AppSidebar extends StatelessWidget {
           ),
 
           // ── Keluar ──
-          _tile(context, Icons.logout, 'Keluar', color: _red, onTap: () {
-            Navigator.pop(context);
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (_) => const LoginView()),
-              (route) => false,
-            );
-          }),
+          _tile(
+            context,
+            Icons.logout,
+            'Keluar',
+            color: _red,
+            onTap: () async {
+              Navigator.pop(context);
+              final auth = AuthController();
+              auth.logout();
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginView()),
+                  (route) => false,
+                );
+              }
+            },
+          ),
 
           const Spacer(),
         ],
@@ -114,8 +168,13 @@ class AppSidebar extends StatelessWidget {
     );
   }
 
-  Widget _tile(BuildContext context, IconData icon, String label,
-      {required VoidCallback onTap, Color color = Colors.white}) {
+  Widget _tile(
+    BuildContext context,
+    IconData icon,
+    String label, {
+    required VoidCallback onTap,
+    Color color = Colors.white,
+  }) {
     return InkWell(
       onTap: onTap,
       child: Padding(

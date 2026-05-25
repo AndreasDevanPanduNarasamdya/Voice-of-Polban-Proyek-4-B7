@@ -1,11 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/app_enums.dart';
-import '../models/article_model.dart';
-import '../models/user_model.dart';
-import '../auth/auth_service.dart';
-import '../controller/article_controller.dart';
+import '../models/cached_user.dart';
+import '../models/local_draft.dart';
+import '../auth/auth_controller.dart';
+import '../controller/post_controller.dart';
 import 'writer_view.dart';
+import 'article_view.dart';
 
 class DraftPage extends StatefulWidget {
   const DraftPage({super.key});
@@ -15,39 +17,64 @@ class DraftPage extends StatefulWidget {
 }
 
 class _DraftPageState extends State<DraftPage> {
-  static const Color _bgColor     = Color(0xFF1A1A1A);
   static const Color _orangeColor = Color(0xFFFF6D00);
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  final AuthService _authService = AuthService();
-  late final ArticleController _articleController;
+  final AuthController _authController = AuthController();
+  late final PostController _articleController;
 
   @override
   void initState() {
     super.initState();
-    _articleController = ArticleController(authService: _authService);
+    _articleController = PostController();
+    _syncDrafts(); // Add this line
   }
 
-  List<ArticleModel> _getMyArticles() {
-    final currentUserId = _authService.getCurrentUserId();
+  Future<void> _syncDrafts() async {
+    final userId = _authController.currentUser?.userId;
+    if (userId != null) {
+      await _articleController.syncMyArticles(userId);
+    }
+  }
+
+  List<LocalDraft> _getMyArticles() {
+    final currentUserId = _authController.currentUser?.userId;
     if (currentUserId == null) return [];
-    final box = Hive.box<ArticleModel>('article_box');
-    return box.values
-        .where((a) => a.authorId == currentUserId)
-        .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    final box = Hive.box<LocalDraft>('local_draft_box');
+
+    return box.values.where((a) => a.userId == currentUserId).toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
   String _getAuthorName(String authorId) {
-    final box = Hive.box<UserModel>('user_box');
+    final box = Hive.box<CachedUser>('cached_user_box');
     return box.get(authorId)?.name ?? 'Penulis';
   }
 
   String _formatDate(DateTime dt) {
-    const days = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
+    const days = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu',
+    ];
     const months = [
-      'Januari','Februari','Maret','April','Mei','Juni',
-      'Juli','Agustus','September','Oktober','November','Desember'
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
     ];
     return '${days[dt.weekday - 1]}, ${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
@@ -56,9 +83,9 @@ class _DraftPageState extends State<DraftPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: _bgColor,
+      backgroundColor: const Color(0xFF1A1A1A),
       appBar: AppBar(
-        backgroundColor: _bgColor,
+        backgroundColor: const Color(0xFF1A1A1A),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: _orangeColor, size: 20),
@@ -68,9 +95,18 @@ class _DraftPageState extends State<DraftPage> {
           text: const TextSpan(
             style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             children: [
-              TextSpan(text: 'V', style: TextStyle(color: Color(0xFFFF6D00))),
-              TextSpan(text: 'o', style: TextStyle(color: Colors.white)),
-              TextSpan(text: 'P', style: TextStyle(color: Color(0xFFFF6D00))),
+              TextSpan(
+                text: 'V',
+                style: TextStyle(color: Color(0xFFFF6D00)),
+              ),
+              TextSpan(
+                text: 'o',
+                style: TextStyle(color: Colors.white),
+              ),
+              TextSpan(
+                text: 'P',
+                style: TextStyle(color: Color(0xFFFF6D00)),
+              ),
             ],
           ),
         ),
@@ -78,17 +114,32 @@ class _DraftPageState extends State<DraftPage> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 14),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.grey[700],
-              child: const Icon(Icons.person, color: Colors.white70, size: 20),
+            child: Builder(
+              builder: (context) {
+                // [CHANGED: Uses the real avatarUrl from Hive instead of pravatar.cc]
+                final avatarUrl = _authController.currentUser?.avatarUrl ?? '';
+                return CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.grey[700],
+                  backgroundImage: avatarUrl.isNotEmpty
+                      ? NetworkImage(avatarUrl)
+                      : null,
+                  child: avatarUrl.isEmpty
+                      ? const Icon(
+                          Icons.person,
+                          color: Colors.white70,
+                          size: 20,
+                        )
+                      : null,
+                );
+              },
             ),
           ),
         ],
       ),
       body: ValueListenableBuilder(
-        valueListenable: Hive.box<ArticleModel>('article_box').listenable(),
-        builder: (context, Box<ArticleModel> box, _) {
+        valueListenable: Hive.box<LocalDraft>('local_draft_box').listenable(),
+        builder: (context, Box<LocalDraft> box, _) {
           final articles = _getMyArticles();
           if (articles.isEmpty) {
             return const Center(
@@ -97,20 +148,32 @@ class _DraftPageState extends State<DraftPage> {
                 children: [
                   Icon(Icons.inbox_outlined, color: Colors.white24, size: 56),
                   SizedBox(height: 12),
-                  Text('Belum ada artikel',
-                      style: TextStyle(color: Colors.white38, fontSize: 15)),
+                  Text(
+                    'Belum ada artikel',
+                    style: TextStyle(color: Colors.white38, fontSize: 15),
+                  ),
                 ],
               ),
             );
           }
-          return ListView.builder(
-            padding: const EdgeInsets.only(top: 4, bottom: 24),
-            itemCount: articles.length,
-            itemBuilder: (ctx, i) => _DraftCard(
-              article: articles[i],
-              authorName: _getAuthorName(articles[i].authorId),
-              dateStr: _formatDate(articles[i].createdAt),
-              controller: _articleController,
+          return RefreshIndicator(
+            color: const Color(0xFFFF6D00),
+            backgroundColor: const Color(0xFF1E1E1E),
+            onRefresh: _syncDrafts, // Triggers the Supabase fetch
+            child: ListView.builder(
+              physics:
+                  const AlwaysScrollableScrollPhysics(), // Required for pull-to-refresh
+              padding: const EdgeInsets.only(top: 4, bottom: 24),
+              itemCount: articles.length,
+              itemBuilder: (ctx, i) {
+                final draft = articles[i];
+                return _DraftCard(
+                  article: draft,
+                  authorName: _getAuthorName(draft.userId),
+                  dateStr: _formatDate(draft.updatedAt),
+                  controller: _articleController,
+                );
+              },
             ),
           );
         },
@@ -119,12 +182,11 @@ class _DraftPageState extends State<DraftPage> {
   }
 }
 
-// ── Card sebagai StatefulWidget agar tiap card punya state expand sendiri ──
 class _DraftCard extends StatefulWidget {
-  final ArticleModel article;
+  final LocalDraft article;
   final String authorName;
   final String dateStr;
-  final ArticleController controller;
+  final PostController controller;
 
   const _DraftCard({
     required this.article,
@@ -140,215 +202,279 @@ class _DraftCard extends StatefulWidget {
 class _DraftCardState extends State<_DraftCard> {
   bool _expanded = false;
 
-  static const Color _bgColor      = Color(0xFF1A1A1A);
-  static const Color _redColor     = Color(0xFFE53935);
-  static const Color _greenColor   = Color(0xFF43A047);
-  static const Color _orangeColor  = Color(0xFFFF6D00);
-  static const Color _dividerColor = Color(0xFF333333);
+  static const Color _redColor = Color(0xFFE53935);
+  static const Color _greenColor = Color(0xFF43A047);
+  static const Color _orangeColor = Color(0xFFFF6D00);
 
   @override
   Widget build(BuildContext context) {
     final article = widget.article;
+    final isDropped =
+        article.status == PostStatus.dropped ||
+        article.status == PostStatus.archived;
 
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFF2A2A2A), width: 1)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Author + tanggal ──
-          Row(
-            children: [
-              const CircleAvatar(
-                radius: 12,
-                backgroundColor: Color(0xFF444444),
-                child: Icon(Icons.person, color: Colors.white60, size: 14),
-              ),
-              const SizedBox(width: 8),
-              Text(widget.authorName,
-                  style: const TextStyle(color: Colors.white70, fontSize: 13)),
-              const SizedBox(width: 8),
-              Text(widget.dateStr,
-                  style: const TextStyle(color: Colors.white38, fontSize: 12)),
-            ],
+    return GestureDetector(
+      // Tapping the card navigates to article page
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ArticlePage(articleId: article.localId),
           ),
-          const SizedBox(height: 10),
-
-          // ── Judul ──
-          Text(
-            article.title,
-            style: const TextStyle(
-                color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+        );
+      },
+      child: Container(
+        decoration: const BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Color(0xFF2A2A2A), width: 1),
           ),
-          const SizedBox(height: 10),
-
-          // ── Tombol "Lihat Gambar" / collapse ──
-          GestureDetector(
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                  color: Colors.white54,
-                  size: 18,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  _expanded ? 'Sembunyikan' : 'Lihat Gambar',
-                  style: const TextStyle(color: Colors.white54, fontSize: 13),
-                ),
-              ],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Date row ──
+            Text(
+              widget.dateStr,
+              style: const TextStyle(color: Colors.white38, fontSize: 12),
             ),
-          ),
+            const SizedBox(height: 8),
 
-          // ── Konten artikel (expandable) ──
-          AnimatedCrossFade(
-            duration: const Duration(milliseconds: 250),
-            crossFadeState: _expanded
-                ? CrossFadeState.showFirst
-                : CrossFadeState.showSecond,
-            firstChild: Container(
-              margin: const EdgeInsets.only(top: 10),
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF252525),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _dividerColor),
-              ),
-              child: Text(
-                article.content,
-                style: const TextStyle(
-                    color: Colors.white12, fontSize: 14, height: 1.6),
+            // ── Title ──
+            Text(
+              article.title,
+              style: TextStyle(
+                color: isDropped ? Colors.white38 : Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            secondChild: const SizedBox.shrink(),
-          ),
-
-          // ── Komentar penolakan (hanya jika rejected) ──
-          if (article.status == ArticleStatus.rejected &&
-              article.rejectionNote != null &&
-              article.rejectionNote!.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _bgColor,
-                border: Border.all(color: _dividerColor),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+
+            // ── Expand / Collapse image button ──
+            GestureDetector(
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('Komentar:',
-                      style: TextStyle(color: Colors.white70, fontSize: 13)),
-                  const SizedBox(height: 6),
-                  Text(article.rejectionNote!,
-                      style:
-                          const TextStyle(color: Colors.white, fontSize: 14)),
+                  Text(
+                    _expanded ? 'Tutup Gambar' : 'Lihat Gambar',
+                    style: const TextStyle(color: Colors.white54, fontSize: 13),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    _expanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: Colors.white54,
+                    size: 18,
+                  ),
                 ],
               ),
             ),
+
+            // ── Expanded image area ──
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 250),
+              crossFadeState: _expanded
+                  ? CrossFadeState.showFirst
+                  : CrossFadeState.showSecond,
+              firstChild: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 10),
+                  if (article.imageUrls != null &&
+                      article.imageUrls!.isNotEmpty)
+                    ...article.imageUrls!.map((imgPath) {
+                      final isNetwork = imgPath.startsWith('http');
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: isNetwork
+                                ? Image.network(
+                                    imgPath,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (error, stackTrace, details) => const Center(
+                                      child: Icon(
+                                        Icons.broken_image,
+                                        color: Colors.white24,
+                                        size: 40,
+                                      ),
+                                    ),
+                                  )
+                                : Image.file(File(imgPath), fit: BoxFit.cover),
+                          ),
+                        ),
+                      );
+                    })
+                  else
+                    Container(
+                      width: double.infinity,
+                      height: 180,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2A2A2A),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.image_outlined,
+                          color: Colors.white24,
+                          size: 40,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              secondChild: const SizedBox.shrink(),
+            ),
+
+            // ── Rejection comment box ──
+            if ((article.status == PostStatus.rejected || article.status == PostStatus.published) &&
+                article.rejectionNote != null &&
+                article.rejectionNote!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Komentar:',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      article.rejectionNote!,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 12),
+            _buildStatusRow(article),
           ],
-
-          const SizedBox(height: 12),
-
-          // ── Tombol aksi berdasarkan status ──
-          _buildStatusRow(article),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildStatusRow(ArticleModel article) {
+  Widget _buildStatusRow(LocalDraft article) {
     switch (article.status) {
-      // Ditolak: Edit + Drop (kiri), chip Ditolak (kanan)
-      case ArticleStatus.rejected:
+      case PostStatus.rejected:
         return Row(
           children: [
             _actionBtn(
               icon: Icons.edit,
               label: 'Edit',
               color: Colors.white,
-              bgColor: const Color(0xFF333333),
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const WriterPage())),
+              bgColor: const Color(0xFF2A2A2A),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => WriterPage(draftId: article.localId),
+                ),
+              ),
             ),
             const SizedBox(width: 8),
             _actionBtn(
-              icon: Icons.delete,
+              icon: Icons.delete_outline,
               label: 'Drop',
-              color: _redColor,
-              bgColor: const Color(0xFF333333),
-              onTap: () => widget.controller.deleteArticle(article.articleId),
+              color: Colors.white,
+              bgColor: const Color(0xFF2A2A2A),
+              onTap: () async {
+                article.status = PostStatus.dropped;
+                await Hive.box<LocalDraft>(
+                  'local_draft_box',
+                ).put(article.localId, article);
+              },
             ),
             const Spacer(),
             _statusChip(
-                icon: Icons.close, label: 'Ditolak', color: _redColor,
-                filled: true),
+              icon: Icons.close,
+              label: 'Ditolak',
+              color: _redColor,
+              filled: true,
+            ),
           ],
         );
 
-      // Terpublikasi: upvote count (kiri), chip hijau (kanan)
-      case ArticleStatus.published:
+      case PostStatus.published:
         return Row(
           children: [
+            // Upvote pill
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFF333333),
-                borderRadius: BorderRadius.circular(8),
+                color: const Color(0xFF2A2A2A),
+                borderRadius: BorderRadius.circular(20),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.arrow_upward, color: _orangeColor, size: 16),
+                  Icon(Icons.arrow_upward, color: _orangeColor, size: 14),
                   SizedBox(width: 6),
-                  Text('300',
-                      style:
-                          TextStyle(color: Colors.white, fontSize: 14)),
+                  Text(
+                    '300',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
             ),
             const Spacer(),
             _statusChip(
-                icon: Icons.check,
-                label: 'Terpublikasi',
-                color: _greenColor,
-                filled: true),
+              icon: Icons.check,
+              label: 'Terpublikasi',
+              color: _greenColor,
+              filled: true,
+            ),
           ],
         );
 
-      // Dihapus/Archived: chip merah (kanan saja)
-      case ArticleStatus.archived:
+      case PostStatus.dropped:
+      case PostStatus.archived:
         return Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             _statusChip(
-                icon: Icons.delete, label: 'Dihapus', color: _redColor,
-                filled: true),
+              icon: Icons.delete_outline,
+              label: 'Dihapus',
+              color: _redColor,
+              filled: true,
+            ),
           ],
         );
 
-      // Menunggu review: chip orange (kanan saja)
-      case ArticleStatus.pending:
+      case PostStatus.pending:
         return Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             _statusChip(
-                icon: Icons.hourglass_empty,
-                label: 'Menunggu Review',
-                color: Colors.orange,
-                filled: false),
+              icon: Icons.access_time,
+              label: 'Menunggu Verifikasi',
+              color: _orangeColor,
+              filled: false,
+            ),
           ],
         );
 
-      // Draft: Edit + Hapus (kiri), chip abu (kanan)
-      case ArticleStatus.draft:
+      case PostStatus.draft:
       default:
         return Row(
           children: [
@@ -356,24 +482,29 @@ class _DraftCardState extends State<_DraftCard> {
               icon: Icons.edit,
               label: 'Edit',
               color: Colors.white,
-              bgColor: const Color(0xFF333333),
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const WriterPage())),
+              bgColor: const Color(0xFF2A2A2A),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => WriterPage(draftId: article.localId),
+                ),
+              ),
             ),
             const SizedBox(width: 8),
             _actionBtn(
-              icon: Icons.delete,
-              label: 'Hapus',
+              icon: Icons.delete_outline,
+              label: 'Drop',
               color: _redColor,
-              bgColor: const Color(0xFF333333),
-              onTap: () => widget.controller.deleteArticle(article.articleId),
+              bgColor: const Color(0xFF2A2A2A),
+              onTap: () => widget.controller.deleteArticle(article.localId),
             ),
             const Spacer(),
             _statusChip(
-                icon: Icons.edit_note,
-                label: 'Draft',
-                color: Colors.white54,
-                filled: false),
+              icon: Icons.edit_note,
+              label: 'Draft',
+              color: _orangeColor,
+              filled: false,
+            ),
           ],
         );
     }
@@ -385,48 +516,51 @@ class _DraftCardState extends State<_DraftCard> {
     required Color color,
     required Color bgColor,
     required VoidCallback onTap,
-  }) =>
-      InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 16),
-              const SizedBox(width: 6),
-              Text(label, style: TextStyle(color: color, fontSize: 13)),
-            ],
-          ),
-        ),
-      );
+  }) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(20),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(color: color, fontSize: 13)),
+        ],
+      ),
+    ),
+  );
 
   Widget _statusChip({
     required IconData icon,
     required String label,
     required Color color,
     required bool filled,
-  }) =>
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: filled ? color.withOpacity(0.15) : const Color(0xFF2A2A2A),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.5)),
+  }) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    decoration: BoxDecoration(
+      color: filled ? color : Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: color),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: filled ? Colors.white : color, size: 14),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: filled ? Colors.white : color,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 15),
-            const SizedBox(width: 6),
-            Text(label,
-                style: TextStyle(
-                    color: color, fontSize: 12, fontWeight: FontWeight.w600)),
-          ],
-        ),
-      );
+      ],
+    ),
+  );
 }
