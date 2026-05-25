@@ -27,7 +27,7 @@ class _DraftPageState extends State<DraftPage> {
   void initState() {
     super.initState();
     _articleController = PostController();
-    _syncDrafts(); // Add this line
+    _syncDrafts(); 
   }
 
   Future<void> _syncDrafts() async {
@@ -54,27 +54,11 @@ class _DraftPageState extends State<DraftPage> {
 
   String _formatDate(DateTime dt) {
     const days = [
-      'Senin',
-      'Selasa',
-      'Rabu',
-      'Kamis',
-      'Jumat',
-      'Sabtu',
-      'Minggu',
+      'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu',
     ];
     const months = [
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember',
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
     ];
     return '${days[dt.weekday - 1]}, ${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
@@ -95,18 +79,9 @@ class _DraftPageState extends State<DraftPage> {
           text: const TextSpan(
             style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             children: [
-              TextSpan(
-                text: 'V',
-                style: TextStyle(color: Color(0xFFFF6D00)),
-              ),
-              TextSpan(
-                text: 'o',
-                style: TextStyle(color: Colors.white),
-              ),
-              TextSpan(
-                text: 'P',
-                style: TextStyle(color: Color(0xFFFF6D00)),
-              ),
+              TextSpan(text: 'V', style: TextStyle(color: Color(0xFFFF6D00))),
+              TextSpan(text: 'o', style: TextStyle(color: Colors.white)),
+              TextSpan(text: 'P', style: TextStyle(color: Color(0xFFFF6D00))),
             ],
           ),
         ),
@@ -116,7 +91,6 @@ class _DraftPageState extends State<DraftPage> {
             padding: const EdgeInsets.only(right: 14),
             child: Builder(
               builder: (context) {
-                // [CHANGED: Uses the real avatarUrl from Hive instead of pravatar.cc]
                 final avatarUrl = _authController.currentUser?.avatarUrl ?? '';
                 return CircleAvatar(
                   radius: 18,
@@ -137,6 +111,25 @@ class _DraftPageState extends State<DraftPage> {
           ),
         ],
       ),
+      
+      // --- PENAMBAHAN TOMBOL TULIS ARTIKEL DI SINI ---
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: _orangeColor,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.edit, size: 18),
+        label: const Text(
+          'Tulis Artikel',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const WriterPage()),
+          );
+        },
+      ),
+      // -----------------------------------------------
+
       body: ValueListenableBuilder(
         valueListenable: Hive.box<LocalDraft>('local_draft_box').listenable(),
         builder: (context, Box<LocalDraft> box, _) {
@@ -159,11 +152,10 @@ class _DraftPageState extends State<DraftPage> {
           return RefreshIndicator(
             color: const Color(0xFFFF6D00),
             backgroundColor: const Color(0xFF1E1E1E),
-            onRefresh: _syncDrafts, // Triggers the Supabase fetch
+            onRefresh: _syncDrafts, 
             child: ListView.builder(
-              physics:
-                  const AlwaysScrollableScrollPhysics(), // Required for pull-to-refresh
-              padding: const EdgeInsets.only(top: 4, bottom: 24),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(top: 4, bottom: 80), // bottom: 80 agar item terbawah tidak tertutup FAB
               itemCount: articles.length,
               itemBuilder: (ctx, i) {
                 final draft = articles[i];
@@ -214,7 +206,6 @@ class _DraftCardState extends State<_DraftCard> {
         article.status == PostStatus.archived;
 
     return GestureDetector(
-      // Tapping the card navigates to article page
       onTap: () {
         Navigator.push(
           context,
@@ -233,14 +224,11 @@ class _DraftCardState extends State<_DraftCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Date row ──
             Text(
               widget.dateStr,
               style: const TextStyle(color: Colors.white38, fontSize: 12),
             ),
             const SizedBox(height: 8),
-
-            // ── Title ──
             Text(
               article.title,
               style: TextStyle(
@@ -250,8 +238,6 @@ class _DraftCardState extends State<_DraftCard> {
               ),
             ),
             const SizedBox(height: 10),
-
-            // ── Expand / Collapse image button ──
             GestureDetector(
               onTap: () => setState(() => _expanded = !_expanded),
               child: Row(
@@ -272,8 +258,6 @@ class _DraftCardState extends State<_DraftCard> {
                 ],
               ),
             ),
-
-            // ── Expanded image area ──
             AnimatedCrossFade(
               duration: const Duration(milliseconds: 250),
               crossFadeState: _expanded
@@ -330,8 +314,6 @@ class _DraftCardState extends State<_DraftCard> {
               ),
               secondChild: const SizedBox.shrink(),
             ),
-
-            // ── Rejection comment box ──
             if ((article.status == PostStatus.rejected || article.status == PostStatus.published) &&
                 article.rejectionNote != null &&
                 article.rejectionNote!.isNotEmpty) ...[
@@ -363,7 +345,6 @@ class _DraftCardState extends State<_DraftCard> {
                 ),
               ),
             ],
-
             const SizedBox(height: 12),
             _buildStatusRow(article),
           ],
@@ -411,11 +392,9 @@ class _DraftCardState extends State<_DraftCard> {
             ),
           ],
         );
-
       case PostStatus.published:
         return Row(
           children: [
-            // Upvote pill
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
@@ -446,7 +425,6 @@ class _DraftCardState extends State<_DraftCard> {
             ),
           ],
         );
-
       case PostStatus.dropped:
       case PostStatus.archived:
         return Row(
@@ -460,7 +438,6 @@ class _DraftCardState extends State<_DraftCard> {
             ),
           ],
         );
-
       case PostStatus.pending:
         return Row(
           mainAxisAlignment: MainAxisAlignment.end,
@@ -473,7 +450,6 @@ class _DraftCardState extends State<_DraftCard> {
             ),
           ],
         );
-
       case PostStatus.draft:
       default:
         return Row(
