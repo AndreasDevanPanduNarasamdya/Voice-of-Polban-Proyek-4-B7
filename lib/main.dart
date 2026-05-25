@@ -1,24 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:voice_of_polban/view/home_view.dart';
-import 'auth/auth_view.dart';
-import 'models/hive_setup.dart';
+
+import 'processing/auth_controller.dart';
+import 'ui/screens/home_view.dart';
+import 'ui/screens/login_view.dart';
+import 'storage/hive_setup.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await setupHive();
-  final sessionBox = Hive.box('session_box');
-  final String? activeUserId = sessionBox.get('logged_in_user_id');
-  final bool isLoggedIn = activeUserId != null;
+  await dotenv.load(fileName: '.env');
+  await Supabase.initialize(
+    url: dotenv.env['SUPABASE_URL']!,
+    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
+  );
 
-  runApp(VoiceOfPolbanApp(isLoggedIn: isLoggedIn));
+  // Ensure Hive is initialized and all required boxes are opened before runApp
+  await Hive.initFlutter();
+
+  // Register adapters and open the canonical boxes (also safe if called twice)
+  await setupHive();
+
+  runApp(const VoiceOfPolbanApp());
 }
 
 class VoiceOfPolbanApp extends StatelessWidget {
-  final bool isLoggedIn;
-
-  const VoiceOfPolbanApp({super.key, required this.isLoggedIn});
+  const VoiceOfPolbanApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +49,9 @@ class VoiceOfPolbanApp extends StatelessWidget {
         ),
       ),
 
-      home: isLoggedIn ? const HomePage() : const LoginView(),
+      home: AuthController().currentUser != null
+          ? const HomePage()
+          : const LoginView(),
     );
   }
 }
