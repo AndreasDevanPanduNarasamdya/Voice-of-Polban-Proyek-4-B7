@@ -1,3 +1,5 @@
+import 'dart:io'; // Tambahkan import ini untuk membaca file gambar lokal
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:voice_of_polban/auth/auth_controller.dart';
@@ -6,7 +8,6 @@ import 'package:voice_of_polban/models/cached_user.dart';
 import 'package:voice_of_polban/view/article_view.dart';
 import '../models/app_enums.dart';
 import '../controller/post_controller.dart';
-import 'dart:convert';
 
 class EditorPage extends StatefulWidget {
   const EditorPage({super.key});
@@ -119,17 +120,12 @@ class _EditorPageState extends State<EditorPage> {
                     backgroundColor: isApprove ? Colors.green : Colors.red,
                   ),
                   onPressed: () async {
-                    // 1. Initial success state
                     bool success = false;
 
                     try {
                       if (isApprove) {
-                        // 2. Call approvePost from your controller
-                        // success = await _controller.approvePost(post.postId);
                         success = await _controller.approvePost(post.postId, note: noteController.text);
                       } else {
-                        // 3. Call rejectPost and pass the note from the text field
-                        // Ensure your controller's rejectPost accepts a 'note' parameter
                         success = await _controller.rejectPost(
                           post.postId,
                           note: noteController.text,
@@ -137,13 +133,11 @@ class _EditorPageState extends State<EditorPage> {
                       }
 
                       if (!success) {
-                        // 4. Handle failure by showing the error message in the UI
                         setState(() {
                           errorMessage =
                               "Gagal memproses perubahan status artikel.";
                         });
                       } else {
-                        // 5. Success flow: Close dialog and show SnackBar
                         if (context.mounted) {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -161,7 +155,6 @@ class _EditorPageState extends State<EditorPage> {
                         }
                       }
                     } catch (e) {
-                      // 6. Catch unexpected errors to prevent app crashes
                       setState(() {
                         errorMessage = "Terjadi kesalahan: $e";
                       });
@@ -180,7 +173,7 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
-// Handles the "Drop" (Delete) action
+  // Handles the "Drop" (Delete) action
   void _dropPost(CachedPost post) {
     final TextEditingController noteController = TextEditingController();
 
@@ -232,10 +225,9 @@ class _EditorPageState extends State<EditorPage> {
                 backgroundColor: Colors.red,
               ),
               onPressed: () {
-                // --- KODE ASLI ANDA ---
                 Hive.box<CachedPost>('cached_post_box').delete(post.postId);
                 
-                Navigator.pop(context); // Tutup pop-up
+                Navigator.pop(context); 
                 
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -243,7 +235,6 @@ class _EditorPageState extends State<EditorPage> {
                     backgroundColor: Colors.red,
                   ),
                 );
-                // ----------------------
               },
               child: const Text(
                 "Drop",
@@ -258,27 +249,11 @@ class _EditorPageState extends State<EditorPage> {
 
   String _formatDate(DateTime dt) {
     const days = [
-      'Senin',
-      'Selasa',
-      'Rabu',
-      'Kamis',
-      'Jumat',
-      'Sabtu',
-      'Minggu',
+      'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu',
     ];
     const months = [
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember',
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
     ];
     return '${days[dt.weekday - 1]}, ${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
@@ -377,14 +352,15 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   Widget _buildEditorCard(BuildContext context, CachedPost post) {
-    // 1. Decode JSON to get the hidden fields
+    // 1. Decode JSON
     final data = jsonDecode(post.cachedData);
 
-    // 2. Extract the correct author_id and title
+    // 2. Extract author_id, title, and image
     final authorId = data['author_id']?.toString() ?? '';
     final title = data['title']?.toString() ?? 'Tanpa Judul';
+    final imageUrls = data['imageUrls'] as List<dynamic>? ?? [];
 
-    // 3. Use the extracted ID and the correct cachedAt date
+    // 3. Setup others
     final authorName = _getAuthorName(authorId);
     final authorAvatar = _getAuthorAvatar(authorId);
     final dateStr = _formatDate(post.cachedAt);
@@ -441,28 +417,38 @@ class _EditorPageState extends State<EditorPage> {
 
           const SizedBox(height: 12),
 
-          // Preview konten — tap untuk baca
-          InkWell(
-            borderRadius: BorderRadius.circular(10),
+          // ── Preview Gambar / Konten (Ganti Kotak Abu-abu Di Sini) ──
+          GestureDetector(
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => ArticlePage(articleId: post.postId),
               ),
             ),
-            child: Container(
-              height: 160,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: const Color(0xFF2A2A2A),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Center(
-                child: Text(
-                  'Tap untuk membaca artikel',
-                  style: TextStyle(color: Colors.white38, fontSize: 13),
-                ),
-              ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: imageUrls.isNotEmpty
+                  ? (() {
+                      final imgPath = imageUrls.first.toString();
+                      final isNetwork = imgPath.startsWith('http');
+                      
+                      return isNetwork
+                          ? Image.network(
+                              imgPath,
+                              width: double.infinity,
+                              height: 160,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => 
+                                  const _ImagePlaceholder(),
+                            )
+                          : Image.file(
+                              File(imgPath),
+                              width: double.infinity,
+                              height: 160,
+                              fit: BoxFit.cover,
+                            );
+                    })()
+                  : const _ImagePlaceholder(),
             ),
           ),
 
@@ -528,6 +514,30 @@ class _EditorPageState extends State<EditorPage> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// Widget Placeholder jika gambar tidak ada atau gagal diload
+class _ImagePlaceholder extends StatelessWidget {
+  const _ImagePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 160,
+      decoration: BoxDecoration(
+        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.image_outlined,
+          color: Colors.white24,
+          size: 40,
         ),
       ),
     );
