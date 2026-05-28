@@ -648,11 +648,15 @@ class PostController {
       throw ArgumentError('postId cannot be empty.');
     }
 
-    LocalVote? existingLocalVote = _voteBox.values.cast<LocalVote?>().firstWhere(
-      (vote) =>
-          vote != null && vote.userId == userId && vote.postId == trimmedPostId,
-      orElse: () => null,
-    );
+    LocalVote? existingLocalVote = _voteBox.values
+        .cast<LocalVote?>()
+        .firstWhere(
+          (vote) =>
+              vote != null &&
+              vote.userId == userId &&
+              vote.postId == trimmedPostId,
+          orElse: () => null,
+        );
 
     final supabase = Supabase.instance.client;
 
@@ -763,7 +767,7 @@ class PostController {
     await _refreshCachedPostVoteState(postId: trimmedPostId, userId: userId);
   }
 
-Future<void> _refreshCachedPostVoteState({
+  Future<void> _refreshCachedPostVoteState({
     required String postId,
     required String userId,
   }) async {
@@ -776,7 +780,7 @@ Future<void> _refreshCachedPostVoteState({
           .select('vote_id')
           .eq('post_id', postId)
           .eq('upvote_status', true);
-      
+
       final totalUpvotes = (upvotesResponse as List).length;
 
       // 2. Cek status vote khusus untuk user yang sedang login saat ini
@@ -806,10 +810,11 @@ Future<void> _refreshCachedPostVoteState({
 
       if (existingPost != null) {
         // Buka JSON lama
-        final parsed = jsonDecode(existingPost.cachedData) as Map<String, dynamic>;
-        
+        final parsed =
+            jsonDecode(existingPost.cachedData) as Map<String, dynamic>;
+
         // Perbarui nilainya
-        parsed['upvote_count'] = totalUpvotes; 
+        parsed['upvote_count'] = totalUpvotes;
         parsed['is_upvoted_by_me'] = isUpvotedByMe;
         parsed['is_downvoted_by_me'] = isDownvotedByMe;
 
@@ -821,7 +826,7 @@ Future<void> _refreshCachedPostVoteState({
       debugPrint('Gagal melakukan sinkronisasi state vote: $e');
     }
   }
-  
+
   List<CachedPost> getOfflineBookmarks() {
     final userId = _currentUserId;
     if (userId == null) {
@@ -915,12 +920,22 @@ Future<void> _refreshCachedPostVoteState({
           }
         }
 
+        final existingPost = _cachedPostsBox.get(
+          postId,
+        ); // 👈 get old entry first
+        final existingParsed = existingPost != null
+            ? jsonDecode(existingPost.cachedData) as Map<String, dynamic>
+            : <String, dynamic>{};
+
         final cachedData = jsonEncode({
           'title': (map['title'] ?? '').toString(),
           'content': (map['content'] ?? '').toString(),
           'author_id': map['author_id']?.toString() ?? '',
           'imageUrls': imageUrls,
           'status': PostStatus.published.name,
+          'upvote_count': existingParsed['upvote_count'] ?? 0,
+          'is_upvoted_by_me': existingParsed['is_upvoted_by_me'] ?? false,
+          'is_downvoted_by_me': existingParsed['is_downvoted_by_me'] ?? false,
         });
 
         final cachedPost = CachedPost(
@@ -930,6 +945,10 @@ Future<void> _refreshCachedPostVoteState({
         );
         await _cachedPostsBox.put(postId, cachedPost);
         posts.add(cachedPost);
+      }
+      final userId = _currentUserId ?? '';
+      for (final post in posts) {
+        await _refreshCachedPostVoteState(postId: post.postId, userId: userId);
       }
       return posts;
     } catch (e) {
@@ -1026,7 +1045,7 @@ Future<void> _refreshCachedPostVoteState({
     try {
       await Supabase.instance.client
           .from('posts')
-          .update({'status': PostStatus.published.name,'rejection_note': note,})
+          .update({'status': PostStatus.published.name, 'rejection_note': note})
           .eq('post_id', postId);
 
       final cachedPost = _cachedPostsBox.get(postId);
@@ -1227,8 +1246,8 @@ Future<void> _refreshCachedPostVoteState({
 
   Future<void> syncLiveVoteCount(String postId) async {
     // Ambil ID user yang sedang login, jika guest berikan string kosong
-    final userId = _currentUserId ?? ''; 
-    
+    final userId = _currentUserId ?? '';
+
     // Panggil fungsi internal yang akan mengunduh jumlah pastinya dari database
     // dan menyimpannya kembali ke local cache (Hive) agar UI otomatis terupdate
     await _refreshCachedPostVoteState(postId: postId, userId: userId);
