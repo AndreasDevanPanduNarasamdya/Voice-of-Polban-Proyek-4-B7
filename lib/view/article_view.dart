@@ -553,7 +553,8 @@ class _ArticlePageState extends State<ArticlePage> {
   // Widget dinamis untuk setiap item komentar
   Widget _buildCommentItem(CommentModel comment) {
     // Format tanggal
-    final formattedDate = DateFormat('dd MMM yyyy').format(comment.createdAt);
+    final wibTime = comment.createdAt.toUtc().add(const Duration(hours: 7));
+    final formattedDate = DateFormat('dd MMM yyyy').format(wibTime);
     final displayName = comment.authorName.isNotEmpty ? comment.authorName : "User";
 
     return Padding(
