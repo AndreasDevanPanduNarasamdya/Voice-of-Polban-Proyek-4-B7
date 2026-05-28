@@ -140,6 +140,7 @@ class _ArticlePageState extends State<ArticlePage> {
   void initState() {
     super.initState();
     _loadComments(); // Panggil fetch comments saat halaman dimuat
+    _postController.syncLiveVoteCount(widget.articleId);
     _post = Hive.box<CachedPost>('cached_post_box').get(widget.articleId);
     if (_post != null) {
       final parsed = jsonDecode(_post!.cachedData) as Map<String, dynamic>;
@@ -552,7 +553,7 @@ class _ArticlePageState extends State<ArticlePage> {
   // Widget dinamis untuk setiap item komentar
   Widget _buildCommentItem(CommentModel comment) {
     // Format tanggal
-    final formattedDate = DateFormat('dd MMM yyyy, HH:mm').format(comment.createdAt);
+    final formattedDate = DateFormat('dd MMM yyyy').format(comment.createdAt);
     final displayName = comment.authorName.isNotEmpty ? comment.authorName : "User";
 
     return Padding(

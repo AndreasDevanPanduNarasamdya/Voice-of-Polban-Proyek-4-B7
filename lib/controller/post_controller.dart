@@ -1182,4 +1182,13 @@ class PostController {
       }
     }
   }
+
+  Future<void> syncLiveVoteCount(String postId) async {
+    // Ambil ID user yang sedang login, jika guest berikan string kosong
+    final userId = _currentUserId ?? ''; 
+    
+    // Panggil fungsi internal yang akan mengunduh jumlah pastinya dari database
+    // dan menyimpannya kembali ke local cache (Hive) agar UI otomatis terupdate
+    await _refreshCachedPostVoteState(postId: postId, userId: userId);
+  }
 }
