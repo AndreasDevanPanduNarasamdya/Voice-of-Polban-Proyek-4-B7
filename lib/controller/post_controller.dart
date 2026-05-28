@@ -648,13 +648,38 @@ class PostController {
       throw ArgumentError('postId cannot be empty.');
     }
 
-    final existingLocalVote = _voteBox.values.cast<LocalVote?>().firstWhere(
+    LocalVote? existingLocalVote = _voteBox.values.cast<LocalVote?>().firstWhere(
       (vote) =>
           vote != null && vote.userId == userId && vote.postId == trimmedPostId,
       orElse: () => null,
     );
 
     final supabase = Supabase.instance.client;
+
+    if (existingLocalVote == null) {
+      try {
+        final remoteVote = await supabase
+            .from('votes')
+            .select('vote_id, upvote_status')
+            .eq('post_id', trimmedPostId)
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (remoteVote != null) {
+          // Ternyata di server sudah ada! Kita tarik dan simpan ke memori lokal
+          existingLocalVote = LocalVote(
+            voteId: remoteVote['vote_id'].toString(),
+            postId: trimmedPostId,
+            userId: userId,
+            upvoteStatus: remoteVote['upvote_status'] == true,
+            isSynced: true,
+          );
+          await _voteBox.put(existingLocalVote.voteId, existingLocalVote);
+        }
+      } catch (e) {
+        debugPrint('Gagal mengecek histori vote di server: $e');
+      }
+    }
 
     // Case A: click the same vote again -> retract vote.
     if (existingLocalVote != null &&
@@ -738,48 +763,65 @@ class PostController {
     await _refreshCachedPostVoteState(postId: trimmedPostId, userId: userId);
   }
 
-  Future<void> _refreshCachedPostVoteState({
+Future<void> _refreshCachedPostVoteState({
     required String postId,
     required String userId,
   }) async {
-    final cachedPost = _cachedPostsBox.get(postId);
-    if (cachedPost == null) {
-      return;
-    }
+    final supabase = Supabase.instance.client;
 
-    int upvoteCount;
     try {
-      final count = await Supabase.instance.client
+      // 1. Ambil total upvote dari server secara real-time
+      final upvotesResponse = await supabase
           .from('votes')
-          .count(CountOption.exact)
+          .select('vote_id')
           .eq('post_id', postId)
           .eq('upvote_status', true);
-      upvoteCount = count;
+      
+      final totalUpvotes = (upvotesResponse as List).length;
+
+      // 2. Cek status vote khusus untuk user yang sedang login saat ini
+      bool isUpvotedByMe = false;
+      bool isDownvotedByMe = false;
+
+      if (userId.isNotEmpty) {
+        final myVote = await supabase
+            .from('votes')
+            .select('upvote_status')
+            .eq('post_id', postId)
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (myVote != null) {
+          if (myVote['upvote_status'] == true) {
+            isUpvotedByMe = true;
+          } else {
+            isDownvotedByMe = true;
+          }
+        }
+      }
+
+      // 3. Simpan data terbaru ke memori lokal (Hive) agar UI otomatis merespons
+      final postBox = Hive.box<CachedPost>('cached_post_box');
+      final existingPost = postBox.get(postId);
+
+      if (existingPost != null) {
+        // Buka JSON lama
+        final parsed = jsonDecode(existingPost.cachedData) as Map<String, dynamic>;
+        
+        // Perbarui nilainya
+        parsed['upvote_count'] = totalUpvotes; 
+        parsed['is_upvoted_by_me'] = isUpvotedByMe;
+        parsed['is_downvoted_by_me'] = isDownvotedByMe;
+
+        // Simpan kembali JSON yang sudah diperbarui
+        existingPost.cachedData = jsonEncode(parsed);
+        await postBox.put(postId, existingPost);
+      }
     } catch (e) {
-      debugPrint('Failed to fetch remote upvote count for $postId: $e');
-      // Fallback: local best-effort count from cached local votes.
-      upvoteCount = _voteBox.values
-          .where((vote) => vote.postId == postId && vote.upvoteStatus)
-          .length;
+      debugPrint('Gagal melakukan sinkronisasi state vote: $e');
     }
-
-    final localUserVote = _voteBox.values.cast<LocalVote?>().firstWhere(
-      (vote) => vote != null && vote.userId == userId && vote.postId == postId,
-      orElse: () => null,
-    );
-
-    final data = Map<String, dynamic>.from(
-      jsonDecode(cachedPost.cachedData) as Map,
-    );
-    data['upvote_count'] = upvoteCount;
-    data['is_upvoted_by_me'] = localUserVote?.upvoteStatus == true;
-    data['is_downvoted_by_me'] = localUserVote?.upvoteStatus == false;
-
-    cachedPost.cachedData = jsonEncode(data);
-    cachedPost.cachedAt = DateTime.now();
-    await _cachedPostsBox.put(postId, cachedPost);
   }
-
+  
   List<CachedPost> getOfflineBookmarks() {
     final userId = _currentUserId;
     if (userId == null) {

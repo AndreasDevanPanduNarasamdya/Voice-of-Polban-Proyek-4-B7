@@ -40,6 +40,23 @@ class _HomePageState extends State<HomePage> {
     return false;
   }
 
+  // int _readUpvoteCount(Map<String, dynamic> parsed) {
+  //   final raw = parsed['upvote_count'];
+  //   if (raw is int) return raw;
+  //   if (raw is num) return raw.toInt();
+  //   if (raw is String) return int.tryParse(raw) ?? 0;
+  //   return 0;
+  // }
+
+  // bool _readBoolFlag(Map<String, dynamic> parsed, String key) {
+  //   final raw = parsed[key];
+  //   if (raw is bool) return raw;
+  //   if (raw is String) {
+  //     return raw.toLowerCase() == 'true';
+  //   }
+  //   return false;
+  // }
+
   Future<void> _handleVote({
     required String postId,
     required bool isUpvoteTarget,
@@ -314,7 +331,8 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildInteractionPillGroup(String postId) {
     return ValueListenableBuilder<Box<CachedPost>>(
-      valueListenable: Hive.box<CachedPost>('cached_post_box').listenable(),
+      // Menambahkan filter `keys` agar widget hanya rebuild jika postId yang sesuai berubah
+      valueListenable: Hive.box<CachedPost>('cached_post_box').listenable(keys: [postId]),
       builder: (context, postBox, _) {
         final livePost = postBox.get(postId);
         final parsed = livePost == null
