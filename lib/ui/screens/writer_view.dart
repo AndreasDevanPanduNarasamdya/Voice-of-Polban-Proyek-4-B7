@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 
+// Storage Layer
 import '../../storage/local_draft.dart';
 
+// Config Layer
 import 'package:hive_flutter/hive_flutter.dart';
 
+// Processing Layer (State Managers)
 import '../../processing/studio_controller.dart';
-import '../../processing/auth_controller.dart';
+import '../../processing/auth_controller.dart'; // <-- ADD THIS to fix the sidebar/user role errors
 import 'package:image_picker/image_picker.dart';
 
 class WriterPage extends StatefulWidget {

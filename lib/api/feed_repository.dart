@@ -458,7 +458,7 @@ class FeedRepository {
             .eq('post_id', trimmedPostId);
       }
       await _voteBox.delete(existingLocalVote.voteId);
-      await refreshCachedPostVoteState(postId: trimmedPostId, userId: userId);
+      await _refreshCachedPostVoteState(postId: trimmedPostId, userId: userId);
       return;
     }
 
@@ -496,7 +496,7 @@ class FeedRepository {
         isSynced: true,
       );
       await _voteBox.put(newLocalVote.voteId, newLocalVote);
-      await refreshCachedPostVoteState(postId: trimmedPostId, userId: userId);
+      await _refreshCachedPostVoteState(postId: trimmedPostId, userId: userId);
       return;
     }
 
@@ -517,10 +517,10 @@ class FeedRepository {
     existingLocalVote.upvoteStatus = isUpvoteTarget;
     existingLocalVote.isSynced = true;
     await _voteBox.put(existingLocalVote.voteId, existingLocalVote);
-    await refreshCachedPostVoteState(postId: trimmedPostId, userId: userId);
+    await _refreshCachedPostVoteState(postId: trimmedPostId, userId: userId);
   }
 
-  Future<void> refreshCachedPostVoteState({
+  Future<void> _refreshCachedPostVoteState({
     required String postId,
     required String userId,
   }) async {

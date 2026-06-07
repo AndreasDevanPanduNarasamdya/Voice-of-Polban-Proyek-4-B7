@@ -1,14 +1,18 @@
-import 'dart:io'; // Tambahkan import ini untuk membaca file gambar lokal
 import 'dart:convert';
 import 'package:flutter/material.dart';
+
+// Config & Storage Layer
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:voice_of_polban/processing/auth_controller.dart';
-import 'package:voice_of_polban/processing/studio_controller.dart';
-import 'package:voice_of_polban/storage/cached_post.dart';
-import 'package:voice_of_polban/storage/cached_user.dart';
-import 'package:voice_of_polban/ui/screens/post_view.dart';
-import 'package:voice_of_polban/api/studio_repository.dart';
 import '../../config/app_enums.dart';
+import '../../storage/cached_post.dart';
+import '../../storage/cached_user.dart';
+
+// Processing Layer
+import '../../processing/studio_controller.dart';
+import '../../processing/auth_controller.dart';
+
+// UI Layer
+import 'post_view.dart';
 
 class EditorPage extends StatefulWidget {
   const EditorPage({super.key});
@@ -19,22 +23,21 @@ class EditorPage extends StatefulWidget {
 
 class _EditorPageState extends State<EditorPage> {
   final AuthController _authController = AuthController();
-  final StudioRepository _controller = StudioRepository();
+  final StudioController _controller = StudioController();
 
   @override
   void initState() {
     super.initState();
-    _controller.fetchPendingPosts();
+    _controller.loadPendingPosts();
   }
 
   Future<void> _refreshEditor() async {
-    await _controller.fetchPendingPosts();
+    await _controller.loadPendingPosts();
   }
 
-  // Helper to resolve Foreign Key (authorId) to Real Name
   String _getAuthorName(String authorId) {
     final user = Hive.box<CachedUser>('cached_user_box').get(authorId);
-    return user?.name ?? "Penulis Tidak Diketahui";
+    return user?.name ?? 'Penulis Tidak Diketahui';
   }
 
   String _getAuthorAvatar(String authorId) {
@@ -53,7 +56,6 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
-  // The Review Dialog to enforce your Anti-Mass-Approval rule
   void _showReviewDialog(
     BuildContext context,
     CachedPost post,
@@ -71,14 +73,14 @@ class _EditorPageState extends State<EditorPage> {
             return AlertDialog(
               backgroundColor: const Color(0xFF1E1E1E),
               title: Text(
-                isApprove ? "Publikasi Artikel" : "Tolak Artikel",
+                isApprove ? 'Publikasi Artikel' : 'Tolak Artikel',
                 style: const TextStyle(color: Colors.white),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    "Masukkan catatan untuk penulis:",
+                    'Masukkan catatan untuk penulis:',
                     style: TextStyle(color: Colors.grey.shade400, fontSize: 14),
                   ),
                   const SizedBox(height: 12),
@@ -87,7 +89,7 @@ class _EditorPageState extends State<EditorPage> {
                     style: const TextStyle(color: Colors.white),
                     maxLines: 3,
                     decoration: InputDecoration(
-                      hintText: "Tulis catatan review...",
+                      hintText: 'Tulis catatan review...',
                       hintStyle: const TextStyle(color: Colors.grey),
                       filled: true,
                       fillColor: const Color(0xFF121212),
@@ -111,7 +113,7 @@ class _EditorPageState extends State<EditorPage> {
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text(
-                    "Batal",
+                    'Batal',
                     style: TextStyle(color: Colors.grey),
                   ),
                 ),
@@ -121,7 +123,6 @@ class _EditorPageState extends State<EditorPage> {
                   ),
                   onPressed: () async {
                     bool success = false;
-
                     try {
                       if (isApprove) {
                         success = await _controller.approvePost(
@@ -138,7 +139,7 @@ class _EditorPageState extends State<EditorPage> {
                       if (!success) {
                         setState(() {
                           errorMessage =
-                              "Gagal memproses perubahan status artikel.";
+                              'Gagal memproses perubahan status artikel.';
                         });
                       } else {
                         if (context.mounted) {
@@ -147,8 +148,8 @@ class _EditorPageState extends State<EditorPage> {
                             SnackBar(
                               content: Text(
                                 isApprove
-                                    ? "Artikel Dipublikasikan!"
-                                    : "Artikel Ditolak",
+                                    ? 'Artikel Dipublikasikan!'
+                                    : 'Artikel Ditolak',
                               ),
                               backgroundColor: isApprove
                                   ? Colors.green
@@ -159,12 +160,12 @@ class _EditorPageState extends State<EditorPage> {
                       }
                     } catch (e) {
                       setState(() {
-                        errorMessage = "Terjadi kesalahan: $e";
+                        errorMessage = 'Terjadi kesalahan: $e';
                       });
                     }
                   },
                   child: Text(
-                    isApprove ? "Publikasi" : "Tolak",
+                    isApprove ? 'Publikasi' : 'Tolak',
                     style: const TextStyle(color: Colors.white),
                   ),
                 ),
@@ -176,25 +177,23 @@ class _EditorPageState extends State<EditorPage> {
     );
   }
 
-  // Handles the "Drop" (Delete) action
   void _dropPost(CachedPost post) {
-    final TextEditingController noteController = TextEditingController();
-
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
+        final TextEditingController noteController = TextEditingController();
         return AlertDialog(
           backgroundColor: const Color(0xFF1E1E1E),
           title: const Text(
-            "Drop Artikel",
+            'Drop Artikel',
             style: TextStyle(color: Colors.white),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                "Masukkan catatan mengapa artikel di-drop:",
+                'Masukkan catatan mengapa artikel di-drop:',
                 style: TextStyle(color: Colors.grey.shade400, fontSize: 14),
               ),
               const SizedBox(height: 12),
@@ -203,7 +202,7 @@ class _EditorPageState extends State<EditorPage> {
                 style: const TextStyle(color: Colors.white),
                 maxLines: 3,
                 decoration: InputDecoration(
-                  hintText: "Tulis catatan drop...",
+                  hintText: 'Tulis catatan drop...',
                   hintStyle: const TextStyle(color: Colors.grey),
                   filled: true,
                   fillColor: const Color(0xFF121212),
@@ -218,23 +217,21 @@ class _EditorPageState extends State<EditorPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Batal", style: TextStyle(color: Colors.grey)),
+              child: const Text('Batal', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
               onPressed: () {
                 Hive.box<CachedPost>('cached_post_box').delete(post.postId);
-
                 Navigator.pop(context);
-
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("Artikel di-drop (dihapus)."),
+                    content: Text('Artikel di-drop (dihapus).'),
                     backgroundColor: Colors.red,
                   ),
                 );
               },
-              child: const Text("Drop", style: TextStyle(color: Colors.white)),
+              child: const Text('Drop', style: TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -324,8 +321,7 @@ class _EditorPageState extends State<EditorPage> {
 
             if (pendingPosts.isEmpty) {
               return ListView(
-                physics:
-                    const AlwaysScrollableScrollPhysics(), // Forces pull-to-refresh
+                physics: const AlwaysScrollableScrollPhysics(),
                 children: const [
                   SizedBox(height: 200),
                   Center(
@@ -363,15 +359,9 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   Widget _buildEditorCard(BuildContext context, CachedPost post) {
-    // 1. Decode JSON
     final data = jsonDecode(post.cachedData);
-
-    // 2. Extract author_id, title, and image
     final authorId = data['author_id']?.toString() ?? '';
     final title = data['title']?.toString() ?? 'Tanpa Judul';
-    final imageUrls = data['imageUrls'] as List<dynamic>? ?? [];
-
-    // 3. Setup others
     final authorName = _getAuthorName(authorId);
     final authorAvatar = _getAuthorAvatar(authorId);
     final dateStr = _formatDate(post.cachedAt);
@@ -384,7 +374,6 @@ class _EditorPageState extends State<EditorPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Author + role badge
           Row(
             children: [
               _buildAvatar(authorAvatar, 16),
@@ -413,10 +402,7 @@ class _EditorPageState extends State<EditorPage> {
               ),
             ],
           ),
-
           const SizedBox(height: 10),
-
-          // Judul artikel
           Text(
             title,
             style: const TextStyle(
@@ -425,47 +411,31 @@ class _EditorPageState extends State<EditorPage> {
               fontWeight: FontWeight.bold,
             ),
           ),
-
           const SizedBox(height: 12),
-
-          // ── Preview Gambar / Konten (Ganti Kotak Abu-abu Di Sini) ──
-          GestureDetector(
+          InkWell(
+            borderRadius: BorderRadius.circular(10),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => ArticlePage(articleId: post.postId),
               ),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: imageUrls.isNotEmpty
-                  ? (() {
-                      final imgPath = imageUrls.first.toString();
-                      final isNetwork = imgPath.startsWith('http');
-
-                      return isNetwork
-                          ? Image.network(
-                              imgPath,
-                              width: double.infinity,
-                              height: 160,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const _ImagePlaceholder(),
-                            )
-                          : Image.file(
-                              File(imgPath),
-                              width: double.infinity,
-                              height: 160,
-                              fit: BoxFit.cover,
-                            );
-                    })()
-                  : const _ImagePlaceholder(),
+            child: Container(
+              height: 160,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2A2A2A),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Center(
+                child: Text(
+                  'Tap untuk membaca artikel',
+                  style: TextStyle(color: Colors.white38, fontSize: 13),
+                ),
+              ),
             ),
           ),
-
           const SizedBox(height: 14),
-
-          // Tombol aksi: Publikasi | Tolak | Drop
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -526,26 +496,6 @@ class _EditorPageState extends State<EditorPage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// Widget Placeholder jika gambar tidak ada atau gagal diload
-class _ImagePlaceholder extends StatelessWidget {
-  const _ImagePlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      height: 160,
-      decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: const Center(
-        child: Icon(Icons.image_outlined, color: Colors.white24, size: 40),
       ),
     );
   }
