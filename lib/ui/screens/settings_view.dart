@@ -27,11 +27,13 @@ class _SettingsPageState extends State<SettingsPage> {
   static const Color _red = Color(0xFFE53935);
 
   final AuthController _auth = AuthController();
+  late String _userName;
   String? _avatarUrl;
 
   @override
   void initState() {
     super.initState();
+    _userName = widget.userName;
     _avatarUrl = widget.userImageUrl ?? _auth.currentUser?.avatarUrl;
   }
 
@@ -132,7 +134,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.userName,
+                      _userName,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 22,
@@ -172,7 +174,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   _pickAndUploadAvatar,
                 ),
                 _line(),
-                _item(Icons.edit_outlined, 'Ubah nama', () {}),
+                _item(Icons.edit_outlined, 'Ubah nama', _showChangeNameDialog),
                 _line(),
                 _item(Icons.info_outlined, 'Baca ketentuan', () {}),
               ],
@@ -293,5 +295,73 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _showChangeNameDialog() async {
+    final TextEditingController controller = TextEditingController(text: _userName);
+    bool isSaving = false;
+    final String? newName = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF232323),
+              title: const Text('Ubah Nama', style: TextStyle(color: Colors.white)),
+              content: TextField(
+                controller: controller,
+                style: const TextStyle(color: Colors.white),
+                enabled: !isSaving,
+                decoration: const InputDecoration(
+                  hintText: 'Masukkan nama baru',
+                  hintStyle: TextStyle(color: Colors.white54),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFFF6D00))),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(dialogContext),
+                  child: const Text('Batal', style: TextStyle(color: Colors.white54)),
+                ),
+                TextButton(
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          final inputName = controller.text.trim();
+                          if (inputName.isEmpty || inputName == _userName) {
+                            Navigator.pop(dialogContext);
+                            return;
+                          }
+                          setDialogState(() => isSaving = true);
+                          final success = await _auth.updateName(inputName);
+                          if (!dialogContext.mounted) return;
+                          if (success) {
+                            Navigator.pop(dialogContext, inputName);
+                          } else {
+                            setDialogState(() => isSaving = false);
+                            ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              const SnackBar(content: Text('Gagal mengubah nama.'), backgroundColor: Colors.red),
+                            );
+                          }
+                        },
+                  child: isSaving
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF6D00)))
+                      : const Text('Simpan', style: TextStyle(color: Color(0xFFFF6D00))),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
+    if (newName != null && mounted) {
+      setState(() => _userName = newName);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nama berhasil diperbarui!'), backgroundColor: Colors.green),
+      );
+    }
   }
 }
