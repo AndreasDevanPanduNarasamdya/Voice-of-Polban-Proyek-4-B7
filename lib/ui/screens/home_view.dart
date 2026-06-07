@@ -80,13 +80,27 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _onlineFeed = _controller.fetchFeed();
     _syncWorker.processSyncQueue();
+
+    // 🚨 FIX: Load the feed, and the millisecond it finishes,
+    // tell the worker to quietly fetch the live votes for every post in the background.
+    _onlineFeed = _controller.fetchFeed().then((posts) {
+      for (var post in posts) {
+        _syncWorker.syncLiveVoteCount(post.postId);
+      }
+      return posts;
+    });
   }
 
   Future<void> _refreshFeed() async {
     setState(() {
-      _onlineFeed = _controller.fetchFeed();
+      // 🚨 FIX: Do the exact same background sync when the user pulls to refresh.
+      _onlineFeed = _controller.fetchFeed().then((posts) {
+        for (var post in posts) {
+          _syncWorker.syncLiveVoteCount(post.postId);
+        }
+        return posts;
+      });
     });
   }
 
