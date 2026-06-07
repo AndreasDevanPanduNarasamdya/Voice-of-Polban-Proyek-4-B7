@@ -35,6 +35,7 @@ class StudioRepository {
     String? content,
     String userId, {
     List<String>? imageUrls,
+    List<String>? hashtags,
   }) async {
     final trimmedTitle = (title?.trim().isNotEmpty ?? false)
         ? title!.trim()
@@ -74,6 +75,7 @@ class StudioRepository {
         status: PostStatus.draft,
         updatedAt: DateTime.now(),
         imageUrls: imageUrls,
+        hashtags: hashtags,
       );
 
       await _draftBox.put(draft.localId, draft);
@@ -92,6 +94,7 @@ class StudioRepository {
         status: PostStatus.draft,
         updatedAt: DateTime.now(),
         imageUrls: imageUrls,
+        hashtags: hashtags,
       );
 
       await _draftBox.put(draft.localId, draft);
@@ -157,6 +160,7 @@ class StudioRepository {
     String newTitle,
     String newContent, {
     List<String>? imageUrls,
+    List<String>? hashtags,
   }) async {
     final draft = _draftBox.get(localId);
     if (draft == null) return null;
@@ -166,6 +170,7 @@ class StudioRepository {
         ? newContent.trim()
         : draft.content;
     draft.imageUrls = imageUrls;
+    draft.hashtags = hashtags;
     draft.updatedAt = DateTime.now();
     await _draftBox.put(localId, draft);
 
@@ -254,7 +259,11 @@ class StudioRepository {
     return uploadedUrls;
   }
 
-  Future<SyncQueue?> submitDraft(String localId) async {
+  // 1. Add rawHashtags to the parameters
+  Future<SyncQueue?> submitDraft(
+    String localId, {
+    List<String>? rawHashtags,
+  }) async {
     final draft = _draftBox.get(localId);
     if (draft == null) return null;
 
@@ -289,6 +298,29 @@ class StudioRepository {
             })
             .select('post_id')
             .single();
+      }
+
+      // ==========================================
+      // PASTE THE HASHTAG LOGIC HERE
+      // ==========================================
+      if (rawHashtags != null && rawHashtags.isNotEmpty) {
+        final cleanHashtags = rawHashtags
+            .map((tag) => tag.trim().toLowerCase().replaceAll('#', ''))
+            .where((tag) => tag.isNotEmpty)
+            .toSet()
+            .toList();
+
+        if (cleanHashtags.isNotEmpty) {
+          try {
+            await supabase.rpc(
+              'process_post_hashtags',
+              params: {'p_post_id': draft.postId, 'p_hashtags': cleanHashtags},
+            );
+            debugPrint('Hashtags processed successfully.');
+          } catch (e) {
+            debugPrint('Failed to process hashtags: $e');
+          }
+        }
       }
 
       if (finalUrls.isNotEmpty) {
@@ -345,6 +377,7 @@ class StudioRepository {
           'status': draft.status.name,
           'imageUrls': finalUrls,
           'updatedAt': draft.updatedAt.toIso8601String(),
+          'hashtags': draft.hashtags,
         }),
         isProcessed: false,
         createdAt: DateTime.now(),
@@ -373,6 +406,7 @@ class StudioRepository {
           'status': draft.status.name,
           'imageUrls': draft.imageUrls,
           'updatedAt': draft.updatedAt.toIso8601String(),
+          'hashtags': draft.hashtags,
         }),
         isProcessed: false,
         createdAt: DateTime.now(),
@@ -523,13 +557,20 @@ class StudioRepository {
     try {
       final rows = await supabase
           .from('posts')
-          .select(
-            'post_id, title, content, author_id, status, created_at, rejection_note, attachments(attachment_details(file_path))',
-          )
+          .select('''
+      post_id, title, content, author_id, status, created_at, rejection_note, 
+      attachments(attachment_details(file_path)),
+      hashtags:post_hashtags(hashtags(name)) 
+    ''')
           .eq('author_id', userId);
 
       for (final row in rows as List) {
         final map = Map<String, dynamic>.from(row as Map);
+        final List<String> hashtags =
+            (map['hashtags'] as List<dynamic>?)
+                ?.map((h) => h['hashtags']['name'].toString())
+                .toList() ??
+            [];
         final postId = (map['post_id'] ?? '').toString();
         if (postId.isEmpty) continue;
 
@@ -584,6 +625,7 @@ class StudioRepository {
           updatedAt: updatedAt,
           rejectionNote: map['rejection_note']?.toString(),
           imageUrls: imageUrls.isEmpty ? null : imageUrls,
+          hashtags: hashtags.isEmpty ? null : hashtags,
         );
 
         await _draftBox.put(draft.localId, draft);

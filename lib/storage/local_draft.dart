@@ -14,6 +14,7 @@ class LocalDraft {
     required this.updatedAt,
     this.rejectionNote,
     this.imageUrls,
+    this.hashtags,
   });
 
   @HiveField(0)
@@ -42,4 +43,7 @@ class LocalDraft {
 
   @HiveField(8)
   List<String>? imageUrls;
+
+  @HiveField(9)
+  List<String>? hashtags;
 }

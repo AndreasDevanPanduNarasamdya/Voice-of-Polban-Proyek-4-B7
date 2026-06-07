@@ -23,19 +23,20 @@ class _WriterPageState extends State<WriterPage> {
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
+  final TextEditingController _hashtagsController = TextEditingController();
 
   bool _isSaving = false;
   bool _isSubmitting = false;
   LocalDraft? _draft;
 
-  final List<Map<String, String>> _sections = [
-    {'id': 'sec_akademik', 'name': 'Akademik'},
-    {'id': 'sec_kampus', 'name': 'Kampus'},
-    {'id': 'sec_acara', 'name': 'Acara'},
-    {'id': 'sec_organisasi', 'name': 'Organisasi'},
-  ];
+  // final List<Map<String, String>> _sections = [
+  //   {'id': 'sec_akademik', 'name': 'Akademik'},
+  //   {'id': 'sec_kampus', 'name': 'Kampus'},
+  //   {'id': 'sec_acara', 'name': 'Acara'},
+  //   {'id': 'sec_organisasi', 'name': 'Organisasi'},
+  // ];
 
-  String? _selectedSectionId;
+  // String? _selectedSectionId;
 
   @override
   void initState() {
@@ -46,6 +47,12 @@ class _WriterPageState extends State<WriterPage> {
       if (_draft != null) {
         _titleController.text = _draft!.title;
         _contentController.text = _draft!.content;
+        if (_draft!.hashtags != null && _draft!.hashtags!.isNotEmpty) {
+          // Re-add the '#' symbol for display in the UI
+          _hashtagsController.text = _draft!.hashtags!
+              .map((tag) => '#$tag')
+              .join(' ');
+        }
         if (_draft!.imageUrls != null) {
           _selectedImages = List<String>.from(
             _draft!.imageUrls!,
@@ -59,6 +66,7 @@ class _WriterPageState extends State<WriterPage> {
   void dispose() {
     _titleController.dispose();
     _contentController.dispose();
+    _hashtagsController.dispose();
     super.dispose();
   }
 
@@ -121,6 +129,12 @@ class _WriterPageState extends State<WriterPage> {
     try {
       LocalDraft? savedDraft;
 
+      final cleanHashtags = _hashtagsController.text
+          .split(RegExp(r'[\s,]+'))
+          .map((tag) => tag.trim().toLowerCase().replaceAll('#', ''))
+          .where((tag) => tag.isNotEmpty)
+          .toList();
+
       // LOGIC FIX: Check if we are updating an existing draft or creating a new one
       if (_draft != null) {
         savedDraft = await _studioController.updateDraft(
@@ -128,6 +142,7 @@ class _WriterPageState extends State<WriterPage> {
           title,
           content,
           imageUrls: _selectedImages,
+          hashtags: cleanHashtags,
         );
       } else {
         savedDraft = await _studioController.saveDraft(
@@ -135,6 +150,7 @@ class _WriterPageState extends State<WriterPage> {
           content,
           userId,
           imageUrls: _selectedImages,
+          hashtags: cleanHashtags,
         );
       }
 
@@ -173,7 +189,18 @@ class _WriterPageState extends State<WriterPage> {
 
     setState(() => _isSubmitting = true);
     try {
-      final queueEntry = await _studioController.submitDraft(_draft!.localId);
+      // Extract hashtags, split by spaces or commas, and remove empty strings
+      final rawHashtagsList = _hashtagsController.text
+          .split(RegExp(r'[\s,]+'))
+          .where((tag) => tag.trim().isNotEmpty)
+          .toList();
+
+      // Pass the extracted list to the controller
+      final queueEntry = await _studioController.submitDraft(
+        _draft!.localId,
+        rawHashtags: rawHashtagsList,
+      );
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -393,33 +420,18 @@ class _WriterPageState extends State<WriterPage> {
                   color: const Color(0xFF1A1A1A),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    dropdownColor: const Color(0xFF1E1E1E),
-                    icon: const Icon(
-                      Icons.keyboard_arrow_down,
-                      color: Colors.white,
+                child: TextField(
+                  controller: _hashtagsController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText: 'Hashtag (contoh: #kampus #polban)',
+                    hintStyle: TextStyle(color: Colors.grey),
+                    border: InputBorder.none,
+                    prefixIcon: Icon(
+                      Icons.tag,
+                      color: Color(0xFFFF8C00),
+                      size: 20,
                     ),
-                    isExpanded: true,
-                    value: _selectedSectionId,
-                    hint: const Text(
-                      'Pilih Kategori',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    items: _sections.map((section) {
-                      return DropdownMenuItem<String>(
-                        value: section['id'],
-                        child: Text(
-                          section['name']!,
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _selectedSectionId = newValue;
-                      });
-                    },
                   ),
                 ),
               ),

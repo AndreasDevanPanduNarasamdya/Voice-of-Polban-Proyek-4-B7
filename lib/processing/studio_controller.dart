@@ -27,6 +27,7 @@ class StudioController {
     String? content,
     String userId, {
     List<String>? imageUrls,
+    List<String>? hashtags,
   }) async {
     isLoading = true;
     errorMessage = null;
@@ -39,6 +40,7 @@ class StudioController {
         content,
         userId,
         imageUrls: persistentImageUrls,
+        hashtags: hashtags,
       );
       return draft;
     } catch (e) {
@@ -55,6 +57,7 @@ class StudioController {
     String newTitle,
     String newContent, {
     List<String>? imageUrls,
+    List<String>? hashtags,
   }) async {
     try {
       final persistentImageUrls = await _repository.persistDraftImages(
@@ -83,11 +86,19 @@ class StudioController {
     }
   }
 
-  Future<SyncQueue?> submitDraft(String localId) async {
+  // Add rawHashtags here as well
+  Future<SyncQueue?> submitDraft(
+    String localId, {
+    List<String>? rawHashtags,
+  }) async {
     isLoading = true;
     errorMessage = null;
     try {
-      final result = await _repository.submitDraft(localId);
+      // Pass the hashtags down to the repository
+      final result = await _repository.submitDraft(
+        localId,
+        rawHashtags: rawHashtags,
+      );
       if (result == null) errorMessage = 'Draft not found.';
       return result;
     } catch (e) {
