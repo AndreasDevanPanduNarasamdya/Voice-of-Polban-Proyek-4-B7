@@ -1,20 +1,16 @@
 import 'package:flutter/foundation.dart';
 
-import '../config/app_enums.dart';
 import '../storage/cached_post.dart';
 import '../storage/local_draft.dart';
 import '../storage/sync_queue.dart';
 import '../api/studio_repository.dart';
 
 class StudioController {
-  // Singleton
   static final StudioController _instance = StudioController._internal();
   factory StudioController() => _instance;
   StudioController._internal();
 
   final StudioRepository _repository = StudioRepository();
-
-  // ─── UI State ────────────────────────────────────────────────────────────────
 
   bool isLoading = false;
   String? errorMessage;
@@ -23,8 +19,6 @@ class StudioController {
   List<CachedPost> get pendingPosts => _pendingPosts;
 
   int get pendingQueueLength => _repository.pendingQueueLength;
-
-  // ─── Drafts ──────────────────────────────────────────────────────────────────
 
   LocalDraft? getDraftById(String localId) => _repository.getDraftById(localId);
 
@@ -37,11 +31,14 @@ class StudioController {
     isLoading = true;
     errorMessage = null;
     try {
+      final persistentImageUrls = await _repository.persistDraftImages(
+        imageUrls,
+      );
       final draft = await _repository.saveDraft(
         title,
         content,
         userId,
-        imageUrls: imageUrls,
+        imageUrls: persistentImageUrls,
       );
       return draft;
     } catch (e) {
@@ -60,11 +57,14 @@ class StudioController {
     List<String>? imageUrls,
   }) async {
     try {
+      final persistentImageUrls = await _repository.persistDraftImages(
+        imageUrls,
+      );
       return await _repository.updateDraft(
         localId,
         newTitle,
         newContent,
-        imageUrls: imageUrls,
+        imageUrls: persistentImageUrls,
       );
     } catch (e) {
       errorMessage = 'Failed to update draft.';
@@ -106,8 +106,6 @@ class StudioController {
       debugPrint('StudioController.syncMyArticles error: $e');
     }
   }
-
-  // ─── Editor ──────────────────────────────────────────────────────────────────
 
   Future<void> loadPendingPosts() async {
     isLoading = true;

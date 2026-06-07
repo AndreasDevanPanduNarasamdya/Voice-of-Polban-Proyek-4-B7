@@ -99,12 +99,15 @@ class _ArticlePageState extends State<ArticlePage> {
         content: text,
       );
 
+      if (!mounted) return;
+
       _commentController.clear();
       FocusScope.of(context).unfocus(); // Menutup keyboard
 
       // Muat ulang komentar untuk menampilkan komentar yang baru dikirim
       await _loadComments();
     } catch (e) {
+      if (!mounted) return;
       final message = e.toString().replaceFirst('Exception: ', '');
       ScaffoldMessenger.of(
         context,

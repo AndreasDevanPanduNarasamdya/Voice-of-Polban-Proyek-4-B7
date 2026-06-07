@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 
-// Storage Layer
 import '../../storage/local_draft.dart';
 
-// Config Layer
 import 'package:hive_flutter/hive_flutter.dart';
 
-// Processing Layer (State Managers)
 import '../../processing/studio_controller.dart';
-import '../../processing/auth_controller.dart'; // <-- ADD THIS to fix the sidebar/user role errors
+import '../../processing/auth_controller.dart';
 import 'package:image_picker/image_picker.dart';
 
 class WriterPage extends StatefulWidget {
-  final String? draftId; // Add this line
+  final String? draftId;
   const WriterPage({super.key, this.draftId});
 
   @override
@@ -47,15 +44,12 @@ class _WriterPageState extends State<WriterPage> {
   void initState() {
     super.initState();
     if (widget.draftId != null) {
-      // Load existing draft from local Hive box
       _draft = Hive.box<LocalDraft>('local_draft_box').get(widget.draftId);
       if (_draft != null) {
         _titleController.text = _draft!.title;
         _contentController.text = _draft!.content;
         if (_draft!.imageUrls != null) {
-          _selectedImages = List<String>.from(
-            _draft!.imageUrls!,
-          ); // Load offline images
+          _selectedImages = List<String>.from(_draft!.imageUrls!);
         }
       }
     }
@@ -127,7 +121,6 @@ class _WriterPageState extends State<WriterPage> {
     try {
       LocalDraft? savedDraft;
 
-      // LOGIC FIX: Check if we are updating an existing draft or creating a new one
       if (_draft != null) {
         savedDraft = await _studioController.updateDraft(
           _draft!.localId,
@@ -147,6 +140,11 @@ class _WriterPageState extends State<WriterPage> {
       if (!mounted) return;
 
       setState(() => _draft = savedDraft);
+      if (savedDraft?.imageUrls != null) {
+        setState(() {
+          _selectedImages = List<String>.from(savedDraft!.imageUrls!);
+        });
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

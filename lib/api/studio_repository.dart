@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -22,8 +24,6 @@ class StudioRepository {
   Box<CachedPost> get _cachedPostsBox =>
       Hive.box<CachedPost>(_cachedPostsBoxName);
   Box<SyncQueue> get _queueBox => Hive.box<SyncQueue>(_queueBoxName);
-
-  // ─── Drafts ─────────────────────────────────────────────────────────────────
 
   LocalDraft? getDraftById(String localId) => _draftBox.get(localId);
 
@@ -99,6 +99,59 @@ class StudioRepository {
     }
   }
 
+  Future<List<String>> persistDraftImages(List<String>? paths) async {
+    if (paths == null || paths.isEmpty) return [];
+
+    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final persistentPaths = <String>[];
+
+    for (int i = 0; i < paths.length; i++) {
+      final path = paths[i];
+
+      if (path.startsWith('http')) {
+        persistentPaths.add(path);
+        continue;
+      }
+
+      try {
+        final sourceFile = File(path);
+        if (!await sourceFile.exists()) {
+          debugPrint('Draft image source not found: $path');
+          continue;
+        }
+
+        if (p.isWithin(documentsDirectory.path, sourceFile.path) ||
+            p.equals(
+              p.normalize(sourceFile.path),
+              p.normalize(documentsDirectory.path),
+            )) {
+          persistentPaths.add(sourceFile.path);
+          continue;
+        }
+
+        final extension = p.extension(path).isNotEmpty
+            ? p.extension(path)
+            : '.jpg';
+        final fileName =
+            'draft_img_${DateTime.now().millisecondsSinceEpoch}_$i$extension';
+        final persistentFile = File(p.join(documentsDirectory.path, fileName));
+
+        if (await persistentFile.exists()) {
+          persistentPaths.add(persistentFile.path);
+          continue;
+        }
+
+        final copiedFile = await sourceFile.copy(persistentFile.path);
+        persistentPaths.add(copiedFile.path);
+      } catch (e) {
+        debugPrint('Failed to persist draft image $path: $e');
+        persistentPaths.add(path);
+      }
+    }
+
+    return persistentPaths;
+  }
+
   Future<LocalDraft?> updateDraft(
     String localId,
     String newTitle,
@@ -171,8 +224,6 @@ class StudioRepository {
     }
   }
 
-  // ─── Image Upload ────────────────────────────────────────────────────────────
-
   Future<List<String>> uploadImages(List<String>? paths, String postId) async {
     if (paths == null || paths.isEmpty) return [];
 
@@ -202,8 +253,6 @@ class StudioRepository {
     }
     return uploadedUrls;
   }
-
-  // ─── Submit for Review ───────────────────────────────────────────────────────
 
   Future<SyncQueue?> submitDraft(String localId) async {
     final draft = _draftBox.get(localId);
@@ -333,8 +382,6 @@ class StudioRepository {
       return queueEntry;
     }
   }
-
-  // ─── Editor Actions ──────────────────────────────────────────────────────────
 
   Future<List<CachedPost>> fetchPendingPosts() async {
     final supabase = Supabase.instance.client;
@@ -471,8 +518,6 @@ class StudioRepository {
     }
   }
 
-  // ─── Sync My Articles ────────────────────────────────────────────────────────
-
   Future<void> syncMyArticles(String userId) async {
     final supabase = Supabase.instance.client;
     try {
@@ -487,6 +532,20 @@ class StudioRepository {
         final map = Map<String, dynamic>.from(row as Map);
         final postId = (map['post_id'] ?? '').toString();
         if (postId.isEmpty) continue;
+
+        final updatedAt =
+            DateTime.tryParse((map['created_at'] ?? '').toString()) ??
+            DateTime.now();
+
+        final existingDraft = _draftBox.get(postId);
+        if (existingDraft != null) {
+          if (existingDraft.updatedAt.isAfter(updatedAt)) {
+            debugPrint(
+              'Melewati sync untuk $postId karena draf lokal lebih baru.',
+            );
+            continue;
+          }
+        }
 
         PostStatus status = PostStatus.draft;
         try {
@@ -507,9 +566,13 @@ class StudioRepository {
           }
         }
 
-        final updatedAt =
-            DateTime.tryParse((map['created_at'] ?? '').toString()) ??
-            DateTime.now();
+        if (existingDraft != null && existingDraft.imageUrls != null) {
+          final localPaths = existingDraft.imageUrls!
+              .where((p) => !p.startsWith('http'))
+              .toList();
+          imageUrls.addAll(localPaths);
+          imageUrls = imageUrls.toSet().toList();
+        }
 
         final draft = LocalDraft(
           localId: postId,

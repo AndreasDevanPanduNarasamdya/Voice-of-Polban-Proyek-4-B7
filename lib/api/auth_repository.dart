@@ -62,7 +62,6 @@ class AuthRepository {
     } catch (e) {
       debugPrint('Supabase login failed: $e');
 
-      // Offline fallback: check local cache
       try {
         final localUser = _usersBox.values.firstWhere(
           (u) => u.email == normalizedInput || u.name == normalizedInput,
@@ -164,6 +163,37 @@ class AuthRepository {
       return updatedUser;
     } catch (e) {
       debugPrint('Failed to update avatar: $e');
+      return null;
+    }
+  }
+
+  Future<CachedUser?> updateName({
+    required CachedUser user,
+    required String newName,
+  }) async {
+    final trimmedName = newName.trim();
+    if (trimmedName.isEmpty) return null;
+
+    try {
+      final supabase = Supabase.instance.client;
+
+      await supabase
+          .from('users')
+          .update({'name': trimmedName})
+          .eq('user_id', user.userId);
+
+      final updatedUser = CachedUser(
+        userId: user.userId,
+        name: trimmedName,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+      );
+
+      await _usersBox.put(user.userId, updatedUser);
+      return updatedUser;
+    } catch (e) {
+      debugPrint('Failed to update name: $e');
       return null;
     }
   }

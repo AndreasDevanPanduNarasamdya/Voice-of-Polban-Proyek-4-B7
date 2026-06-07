@@ -3,7 +3,6 @@ import '../storage/cached_user.dart';
 import '../api/auth_repository.dart';
 
 class AuthController {
-  // Singleton
   static final AuthController _instance = AuthController._internal();
   factory AuthController() => _instance;
 
@@ -49,6 +48,22 @@ class AuthController {
     final updatedUser = await _repository.updateProfilePicture(
       user: user,
       imagePath: imagePath,
+    );
+
+    if (updatedUser != null) {
+      _currentUser = updatedUser;
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> updateName(String newName) async {
+    final user = _currentUser;
+    if (user == null) return false;
+
+    final updatedUser = await _repository.updateName(
+      user: user,
+      newName: newName,
     );
 
     if (updatedUser != null) {
