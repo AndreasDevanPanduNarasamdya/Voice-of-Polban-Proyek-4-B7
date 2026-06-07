@@ -75,7 +75,6 @@ class SyncWorker {
               params: {'p_post_id': payload['postId'], 'p_hashtags': hashtags},
             );
           }
-          task.isProcessed = true;
         } else if (task.actionType == 'UPDATE_DRAFT') {
           await _supabase
               .from('posts')

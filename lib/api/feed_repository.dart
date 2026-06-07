@@ -228,17 +228,8 @@ class FeedRepository {
           }
         }
 
-        final cachedPost = CachedPost(
-          postId: postId,
-          cachedData: jsonEncode({
-            'title': (map['title'] ?? '').toString(),
-            'content': (map['content'] ?? '').toString(),
-            'author_id': map['author_id']?.toString() ?? '',
-            'imageUrls': imageUrls,
-            'status': PostStatus.published.name,
-          }),
-          cachedAt: _parsePostDate(map['created_at']),
-        );
+        final cachedPost = _buildCachedPost(map);
+        if (cachedPost == null) continue;
 
         await _cachedPostsBox.put(postId, cachedPost);
         posts.add(cachedPost);
@@ -264,9 +255,7 @@ class FeedRepository {
             'post_id, title, content, author_id, status, created_at, attachments(attachment_details(file_path))',
           )
           .eq('status', PostStatus.published.name)
-          .or(
-            'title.ilike.%$trimmedQuery%,content.ilike.%$trimmedQuery%',
-          )
+          .or('title.ilike.%$trimmedQuery%,content.ilike.%$trimmedQuery%')
           .order('created_at', ascending: false)
           .limit(20);
 

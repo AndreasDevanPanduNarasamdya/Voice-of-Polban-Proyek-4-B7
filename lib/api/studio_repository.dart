@@ -508,6 +508,7 @@ class StudioRepository {
           .update({'status': PostStatus.published.name, 'rejection_note': note})
           .eq('post_id', postId);
 
+      // Update cached_post_box
       final cachedPost = _cachedPostsBox.get(postId);
       if (cachedPost != null) {
         final data = Map<String, dynamic>.from(
@@ -517,6 +518,15 @@ class StudioRepository {
         cachedPost.cachedData = jsonEncode(data);
         cachedPost.cachedAt = DateTime.now();
         await _cachedPostsBox.put(postId, cachedPost);
+      }
+
+      // ← ADD THIS: also update local_draft_box so the UI reacts immediately
+      final draft = _draftBox.get(postId);
+      if (draft != null) {
+        draft.status = PostStatus.published;
+        draft.rejectionNote = note.isNotEmpty ? note : draft.rejectionNote;
+        draft.updatedAt = DateTime.now();
+        await _draftBox.put(postId, draft);
       }
 
       return true;
@@ -545,6 +555,14 @@ class StudioRepository {
         await _cachedPostsBox.put(postId, cachedPost);
       }
 
+      final draft = _draftBox.get(postId);
+      if (draft != null) {
+        draft.status = PostStatus.rejected;
+        draft.rejectionNote = note.isNotEmpty ? note : draft.rejectionNote;
+        draft.updatedAt = DateTime.now();
+        await _draftBox.put(postId, draft);
+      }
+
       return true;
     } catch (e) {
       debugPrint('Failed to reject post $postId: $e');
@@ -558,7 +576,7 @@ class StudioRepository {
       final rows = await supabase
           .from('posts')
           .select('''
-      post_id, title, content, author_id, status, created_at, rejection_note, 
+      post_id, title, content, author_id, status, created_at, edited_at, rejection_note, 
       attachments(attachment_details(file_path)),
       hashtags:post_hashtags(hashtags(name)) 
     ''')
@@ -575,15 +593,29 @@ class StudioRepository {
         if (postId.isEmpty) continue;
 
         final updatedAt =
-            DateTime.tryParse((map['created_at'] ?? '').toString()) ??
+            DateTime.tryParse(
+              (map['edited_at'] ?? map['created_at'] ?? '').toString(),
+            ) ??
             DateTime.now();
 
         final existingDraft = _draftBox.get(postId);
         if (existingDraft != null) {
           if (existingDraft.updatedAt.isAfter(updatedAt)) {
-            debugPrint(
-              'Melewati sync untuk $postId karena draf lokal lebih baru.',
-            );
+            // Parse status inline here, no variable needed yet
+            PostStatus serverStatus = PostStatus.draft;
+            try {
+              if (map['status'] != null) {
+                serverStatus = PostStatus.values.byName(
+                  map['status'].toString().toLowerCase(),
+                );
+              }
+            } catch (_) {}
+
+            if (existingDraft.status != serverStatus) {
+              existingDraft.status = serverStatus;
+              existingDraft.rejectionNote = map['rejection_note']?.toString();
+              await _draftBox.put(existingDraft.localId, existingDraft);
+            }
             continue;
           }
         }
