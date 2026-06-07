@@ -25,8 +25,8 @@ class _HomePageState extends State<HomePage> {
   final SyncWorker _syncWorker = SyncWorker();
   late Future<List<CachedPost>> _onlineFeed;
 
-  int _readUpvoteCount(Map<String, dynamic> parsed) {
-    final raw = parsed['upvote_count'];
+  int _readCount(Map<String, dynamic> parsed, String key) {
+    final raw = parsed[key];
     if (raw is int) return raw;
     if (raw is num) return raw.toInt();
     if (raw is String) return int.tryParse(raw) ?? 0;
@@ -309,7 +309,7 @@ class _HomePageState extends State<HomePage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _buildInteractionPill(Icons.chat_bubble_outline, "30"),
+                  _buildReactiveCommentPill(post.postId),
                   const SizedBox(width: 12),
                   _buildInteractionPillGroup(post.postId),
                 ],
@@ -345,6 +345,23 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildReactiveCommentPill(String postId) {
+    return ValueListenableBuilder<Box<CachedPost>>(
+      valueListenable: Hive.box<CachedPost>(
+        'cached_post_box',
+      ).listenable(keys: [postId]),
+      builder: (context, postBox, _) {
+        final livePost = postBox.get(postId);
+        final parsed = livePost == null
+            ? <String, dynamic>{}
+            : Map<String, dynamic>.from(jsonDecode(livePost.cachedData) as Map);
+
+        final commentCount = _readCount(parsed, 'comment_count');
+        return _buildInteractionPill(Icons.chat_bubble_outline, commentCount.toString());
+      },
+    );
+  }
+
   Widget _buildInteractionPillGroup(String postId) {
     return ValueListenableBuilder<Box<CachedPost>>(
       // Menambahkan filter `keys` agar widget hanya rebuild jika postId yang sesuai berubah
@@ -357,7 +374,7 @@ class _HomePageState extends State<HomePage> {
             ? <String, dynamic>{}
             : Map<String, dynamic>.from(jsonDecode(livePost.cachedData) as Map);
 
-        final upvoteCount = _readUpvoteCount(parsed);
+        final upvoteCount = _readCount(parsed, 'upvote_count');
         final isUpvotedByMe = _readBoolFlag(parsed, 'is_upvoted_by_me');
         final isDownvotedByMe = _readBoolFlag(parsed, 'is_downvoted_by_me');
 

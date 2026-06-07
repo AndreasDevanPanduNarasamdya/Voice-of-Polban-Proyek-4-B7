@@ -632,6 +632,16 @@ class PostController {
       'user_id': userId,
       'content': trimmedContent,
     });
+
+    final cachedPost = _cachedPostsBox.get(trimmedPostId);
+    if (cachedPost != null) {
+      final data = Map<String, dynamic>.from(jsonDecode(cachedPost.cachedData) as Map);
+      final currentCount = data['comment_count'] ?? 0;
+      data['comment_count'] = (currentCount is num ? currentCount.toInt() : int.tryParse(currentCount.toString()) ?? 0) + 1;
+      cachedPost.cachedData = jsonEncode(data);
+      cachedPost.cachedAt = DateTime.now();
+      await _cachedPostsBox.put(trimmedPostId, cachedPost);
+    }
   }
 
   Future<void> castVote({

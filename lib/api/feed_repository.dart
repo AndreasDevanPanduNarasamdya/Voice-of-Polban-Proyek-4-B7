@@ -284,6 +284,16 @@ class FeedRepository {
       'user_id': userId,
       'content': trimmedContent,
     });
+
+    final cachedPost = _cachedPostsBox.get(trimmedPostId);
+    if (cachedPost != null) {
+      final data = Map<String, dynamic>.from(jsonDecode(cachedPost.cachedData) as Map);
+      final currentCount = data['comment_count'] ?? 0;
+      data['comment_count'] = (currentCount is num ? currentCount.toInt() : int.tryParse(currentCount.toString()) ?? 0) + 1;
+      cachedPost.cachedData = jsonEncode(data);
+      cachedPost.cachedAt = DateTime.now();
+      await _cachedPostsBox.put(trimmedPostId, cachedPost);
+    }
   }
 
   // ─── Bookmarks ──────────────────────────────────────────────────────────────
@@ -547,10 +557,22 @@ class FeedRepository {
       orElse: () => null,
     );
 
+    int commentCount = 0;
+    try {
+      final cCount = await Supabase.instance.client
+          .from('comments')
+          .count(CountOption.exact)
+          .eq('post_id', postId);
+      commentCount = cCount;
+    } catch (e) {
+      debugPrint('Failed to fetch remote comment count for $postId: $e');
+    }
+
     final data = Map<String, dynamic>.from(
       jsonDecode(cachedPost.cachedData) as Map,
     );
     data['upvote_count'] = upvoteCount;
+    data['comment_count'] = commentCount;
     data['is_upvoted_by_me'] = localUserVote?.upvoteStatus == true;
     data['is_downvoted_by_me'] = localUserVote?.upvoteStatus == false;
 
