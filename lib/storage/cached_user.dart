@@ -1,7 +1,5 @@
 import 'package:hive/hive.dart';
-
-import 'app_enums.dart';
-
+import '../config/app_enums.dart';
 part 'cached_user.g.dart';
 
 @HiveType(typeId: 7)

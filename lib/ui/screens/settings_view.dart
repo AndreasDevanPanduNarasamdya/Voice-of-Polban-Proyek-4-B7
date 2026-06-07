@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../models/app_enums.dart';
-import '../auth/auth_controller.dart';
-import '../auth/auth_view.dart';
+import '../../config/app_enums.dart';
+import '../../processing/auth_controller.dart';
+import '../screens/login_view.dart';
 
 class SettingsPage extends StatefulWidget {
   final String userName;

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:voice_of_polban/auth/auth_view.dart';
-import 'package:voice_of_polban/auth/auth_controller.dart';
-import 'package:voice_of_polban/view/editor_view.dart';
-import 'package:voice_of_polban/view/draft_view.dart';
-import 'package:voice_of_polban/view/settings_view.dart';
-import '../models/app_enums.dart';
+import 'package:voice_of_polban/ui/screens/login_view.dart';
+import 'package:voice_of_polban/processing/auth_controller.dart';
+import 'package:voice_of_polban/ui/screens/editor_view.dart';
+import 'package:voice_of_polban/ui/screens/draft_view.dart';
+import 'package:voice_of_polban/ui/screens/settings_view.dart';
+import '../../config/app_enums.dart';
 
 class AppSidebar extends StatelessWidget {
   final UserRole currentUserRole;

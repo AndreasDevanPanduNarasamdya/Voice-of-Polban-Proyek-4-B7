@@ -2,12 +2,13 @@ import 'dart:io'; // Tambahkan import ini untuk membaca file gambar lokal
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:voice_of_polban/auth/auth_controller.dart';
-import 'package:voice_of_polban/models/cached_post.dart';
-import 'package:voice_of_polban/models/cached_user.dart';
-import 'package:voice_of_polban/view/article_view.dart';
-import '../models/app_enums.dart';
-import '../controller/post_controller.dart';
+import 'package:voice_of_polban/processing/auth_controller.dart';
+import 'package:voice_of_polban/storage/cached_post.dart';
+import 'package:voice_of_polban/storage/cached_user.dart';
+import 'package:voice_of_polban/ui/screens/post_view.dart';
+import '../../config/app_enums.dart';
+import '../../processing/studio_controller.dart';
+import '../../api/studio_repository.dart';
 
 class EditorPage extends StatefulWidget {
   const EditorPage({super.key});
@@ -18,17 +19,18 @@ class EditorPage extends StatefulWidget {
 
 class _EditorPageState extends State<EditorPage> {
   final AuthController _authController = AuthController();
-  late final PostController _controller;
+  late final StudioController _controller;
+  late final StudioRepository _repository_controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = PostController();
-    _controller.fetchPendingPosts();
+    _controller = StudioController();
+    _repository_controller.fetchPendingPosts();
   }
 
   Future<void> _refreshEditor() async {
-    await _controller.fetchPendingPosts();
+    await _repository_controller.fetchPendingPosts();
   }
 
   // Helper to resolve Foreign Key (authorId) to Real Name
@@ -124,7 +126,10 @@ class _EditorPageState extends State<EditorPage> {
 
                     try {
                       if (isApprove) {
-                        success = await _controller.approvePost(post.postId, note: noteController.text);
+                        success = await _controller.approvePost(
+                          post.postId,
+                          note: noteController.text,
+                        );
                       } else {
                         success = await _controller.rejectPost(
                           post.postId,
@@ -215,20 +220,15 @@ class _EditorPageState extends State<EditorPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
-                "Batal",
-                style: TextStyle(color: Colors.grey),
-              ),
+              child: const Text("Batal", style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
               onPressed: () {
                 Hive.box<CachedPost>('cached_post_box').delete(post.postId);
-                
-                Navigator.pop(context); 
-                
+
+                Navigator.pop(context);
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text("Artikel di-drop (dihapus)."),
@@ -236,10 +236,7 @@ class _EditorPageState extends State<EditorPage> {
                   ),
                 );
               },
-              child: const Text(
-                "Drop",
-                style: TextStyle(color: Colors.white),
-              ),
+              child: const Text("Drop", style: TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -431,14 +428,14 @@ class _EditorPageState extends State<EditorPage> {
                   ? (() {
                       final imgPath = imageUrls.first.toString();
                       final isNetwork = imgPath.startsWith('http');
-                      
+
                       return isNetwork
                           ? Image.network(
                               imgPath,
                               width: double.infinity,
                               height: 160,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => 
+                              errorBuilder: (context, error, stackTrace) =>
                                   const _ImagePlaceholder(),
                             )
                           : Image.file(
@@ -534,11 +531,7 @@ class _ImagePlaceholder extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: const Center(
-        child: Icon(
-          Icons.image_outlined,
-          color: Colors.white24,
-          size: 40,
-        ),
+        child: Icon(Icons.image_outlined, color: Colors.white24, size: 40),
       ),
     );
   }

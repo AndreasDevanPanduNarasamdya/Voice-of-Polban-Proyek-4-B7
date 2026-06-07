@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:voice_of_polban/auth/auth_view.dart';
+import 'package:voice_of_polban/ui/screens/login_view.dart';
 
 void main() {
   testWidgets('Auth view smoke test', (WidgetTester tester) async {

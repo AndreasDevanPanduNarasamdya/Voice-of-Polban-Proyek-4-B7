@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart'; // Used for formatting real dates
-import '../models/cached_post.dart';
-import '../models/cached_user.dart';
-import '../models/local_bookmark.dart';
-import '../models/app_enums.dart';
-import '../controller/post_controller.dart';
-import '../auth/auth_controller.dart';
-import 'package:voice_of_polban/view/sidebar.dart';
-import 'article_view.dart';
+import '../../storage/cached_post.dart';
+import '../../storage/cached_user.dart';
+import '../../storage/local_bookmark.dart';
+import '../../config/app_enums.dart';
+import '../../processing/feed_controller.dart';
+import '../../processing/sync_worker.dart';
+import '../../processing/auth_controller.dart';
+import 'package:voice_of_polban/ui/widgets/sidebar.dart';
+import 'post_view.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,7 +21,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final AuthController _authController = AuthController();
-  final PostController _controller = PostController();
+  final FeedController _controller = FeedController();
+  final SyncWorker _syncWorker = SyncWorker();
   late Future<List<CachedPost>> _onlineFeed;
 
   int _readUpvoteCount(Map<String, dynamic> parsed) {
@@ -78,13 +80,27 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _onlineFeed = _controller.fetchFeed();
-    _controller.processSyncQueue();
+    _syncWorker.processSyncQueue();
+
+    // 🚨 FIX: Load the feed, and the millisecond it finishes,
+    // tell the worker to quietly fetch the live votes for every post in the background.
+    _onlineFeed = _controller.fetchFeed().then((posts) {
+      for (var post in posts) {
+        _syncWorker.syncLiveVoteCount(post.postId);
+      }
+      return posts;
+    });
   }
 
   Future<void> _refreshFeed() async {
     setState(() {
-      _onlineFeed = _controller.fetchFeed();
+      // 🚨 FIX: Do the exact same background sync when the user pulls to refresh.
+      _onlineFeed = _controller.fetchFeed().then((posts) {
+        for (var post in posts) {
+          _syncWorker.syncLiveVoteCount(post.postId);
+        }
+        return posts;
+      });
     });
   }
 
@@ -332,7 +348,9 @@ class _HomePageState extends State<HomePage> {
   Widget _buildInteractionPillGroup(String postId) {
     return ValueListenableBuilder<Box<CachedPost>>(
       // Menambahkan filter `keys` agar widget hanya rebuild jika postId yang sesuai berubah
-      valueListenable: Hive.box<CachedPost>('cached_post_box').listenable(keys: [postId]),
+      valueListenable: Hive.box<CachedPost>(
+        'cached_post_box',
+      ).listenable(keys: [postId]),
       builder: (context, postBox, _) {
         final livePost = postBox.get(postId);
         final parsed = livePost == null

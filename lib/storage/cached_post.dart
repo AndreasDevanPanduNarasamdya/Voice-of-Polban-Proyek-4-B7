@@ -1,5 +1,4 @@
 import 'package:hive/hive.dart';
-
 part 'cached_post.g.dart';
 
 @HiveType(typeId: 2)

@@ -1,12 +1,11 @@
 import 'package:hive_flutter/hive_flutter.dart';
-
-import 'app_enums.dart';
-import 'local_draft.dart';
-import 'cached_post.dart';
-import 'sync_queue.dart';
-import 'local_vote.dart';
-import 'local_bookmark.dart';
+import '../config/app_enums.dart';
 import 'cached_user.dart';
+import 'cached_post.dart';
+import 'local_draft.dart';
+import 'local_bookmark.dart';
+import 'local_vote.dart';
+import 'sync_queue.dart';
 
 Future<void> setupHive() async {
   await Hive.initFlutter();
@@ -57,5 +56,8 @@ Future<void> setupHive() async {
   // Session box used by UI to listen for login/logout changes
   if (!Hive.isBoxOpen('session_box')) {
     await Hive.openBox('session_box');
+  }
+  if (!Hive.isBoxOpen('pending_post_box')) {
+    await Hive.openBox<CachedPost>('pending_post_box');
   }
 }

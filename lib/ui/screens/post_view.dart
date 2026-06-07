@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../models/cached_post.dart';
-import '../models/cached_user.dart';
-import '../models/local_bookmark.dart';
-import '../models/comment_model.dart';
-import '../auth/auth_controller.dart';
-import '../controller/post_controller.dart';
+import '../../storage/cached_post.dart';
+import '../../storage/cached_user.dart';
+import '../../storage/local_bookmark.dart';
+import '../../storage/comment_model.dart';
+import '../../processing/auth_controller.dart';
+import '../../processing/feed_controller.dart';
+import '../../processing/sync_worker.dart';
+import '../../api/feed_repository.dart';
 
 class ArticlePage extends StatefulWidget {
   final String articleId;
@@ -20,9 +22,11 @@ class ArticlePage extends StatefulWidget {
 class _ArticlePageState extends State<ArticlePage> {
   CachedPost? _post;
   final AuthController _authController = AuthController();
-  final PostController _postController = PostController();
+  final FeedController _feedController = FeedController();
+  final FeedRepository _feedRepository = FeedRepository();
+  final SyncWorker _syncWorker = SyncWorker();
   final PageController _pageController = PageController();
-  
+
   // Controller dan State untuk fitur komentar
   final TextEditingController _commentController = TextEditingController();
   List<CommentModel> _comments = [];
@@ -51,7 +55,7 @@ class _ArticlePageState extends State<ArticlePage> {
 
   Future<void> _handleVote({required bool isUpvoteTarget}) async {
     try {
-      await _postController.castVote(
+      await _feedController.castVote(
         postId: widget.articleId,
         isUpvoteTarget: isUpvoteTarget,
       );
@@ -68,9 +72,9 @@ class _ArticlePageState extends State<ArticlePage> {
   Future<void> _loadComments() async {
     if (!mounted) return;
     setState(() => _isLoadingComments = true);
-    
+
     try {
-      final comments = await _postController.fetchComments(widget.articleId);
+      final comments = await _feedRepository.fetchComments(widget.articleId);
       if (mounted) {
         setState(() {
           _comments = comments;
@@ -90,21 +94,18 @@ class _ArticlePageState extends State<ArticlePage> {
 
     setState(() => _isSubmittingComment = true);
     try {
-      await _postController.addComment(
-        postId: widget.articleId, 
-        content: text
-      );
-      
+      await _feedRepository.addComment(postId: widget.articleId, content: text);
+
       _commentController.clear();
       FocusScope.of(context).unfocus(); // Menutup keyboard
-      
+
       // Muat ulang komentar untuk menampilkan komentar yang baru dikirim
       await _loadComments();
     } catch (e) {
       final message = e.toString().replaceFirst('Exception: ', '');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message))
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _isSubmittingComment = false);
     }
@@ -140,7 +141,7 @@ class _ArticlePageState extends State<ArticlePage> {
   void initState() {
     super.initState();
     _loadComments(); // Panggil fetch comments saat halaman dimuat
-    _postController.syncLiveVoteCount(widget.articleId);
+    _syncWorker.syncLiveVoteCount(widget.articleId);
     _post = Hive.box<CachedPost>('cached_post_box').get(widget.articleId);
     if (_post != null) {
       final parsed = jsonDecode(_post!.cachedData) as Map<String, dynamic>;
@@ -452,7 +453,7 @@ class _ArticlePageState extends State<ArticlePage> {
                                   constraints: const BoxConstraints(),
                                   padding: EdgeInsets.zero,
                                   visualDensity: VisualDensity.compact,
-                                  onPressed: () => _postController
+                                  onPressed: () => _feedController
                                       .toggleBookmark(widget.articleId),
                                   icon: Icon(
                                     isBookmarked
@@ -478,7 +479,10 @@ class _ArticlePageState extends State<ArticlePage> {
 
             // Comment Input Section
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8.0,
+              ),
               child: Row(
                 children: [
                   _buildAvatar(myAvatarUrl, 18),
@@ -489,10 +493,16 @@ class _ArticlePageState extends State<ArticlePage> {
                       style: const TextStyle(color: Colors.white, fontSize: 14),
                       decoration: InputDecoration(
                         hintText: 'Tulis Komentar...',
-                        hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+                        hintStyle: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 14,
+                        ),
                         filled: true,
                         fillColor: const Color(0xFF1E1E1E),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 12.0,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30.0),
                           borderSide: BorderSide.none,
@@ -507,12 +517,19 @@ class _ArticlePageState extends State<ArticlePage> {
                       ? const Padding(
                           padding: EdgeInsets.all(12.0),
                           child: SizedBox(
-                            width: 24, height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF8C00)),
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFFFF8C00),
+                            ),
                           ),
                         )
                       : IconButton(
-                          icon: const Icon(Icons.send, color: Color(0xFFFF8C00)),
+                          icon: const Icon(
+                            Icons.send,
+                            color: Color(0xFFFF8C00),
+                          ),
                           onPressed: _submitComment,
                         ),
                 ],
@@ -521,28 +538,34 @@ class _ArticlePageState extends State<ArticlePage> {
             const SizedBox(height: 16),
 
             // Dynamic Comments List
-            _isLoadingComments 
-                ? const Center(child: Padding(
-                    padding: EdgeInsets.all(20.0),
-                    child: CircularProgressIndicator(color: Color(0xFFFF8C00)),
-                  ))
-                : _comments.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Text("Belum ada komentar. Jadilah yang pertama!", 
-                          style: TextStyle(color: Colors.grey),
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(), // Agar scroll mengikuti SingleChildScrollView
-                        itemCount: _comments.length,
-                        itemBuilder: (context, index) {
-                          return _buildCommentItem(_comments[index]);
-                        },
+            _isLoadingComments
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(20.0),
+                      child: CircularProgressIndicator(
+                        color: Color(0xFFFF8C00),
                       ),
-                      
+                    ),
+                  )
+                : _comments.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text(
+                      "Belum ada komentar. Jadilah yang pertama!",
+                      style: TextStyle(color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    physics:
+                        const NeverScrollableScrollPhysics(), // Agar scroll mengikuti SingleChildScrollView
+                    itemCount: _comments.length,
+                    itemBuilder: (context, index) {
+                      return _buildCommentItem(_comments[index]);
+                    },
+                  ),
+
             const SizedBox(height: 30),
           ],
         ),
@@ -555,7 +578,9 @@ class _ArticlePageState extends State<ArticlePage> {
     // Format tanggal
     final wibTime = comment.createdAt.toUtc().add(const Duration(hours: 7));
     final formattedDate = DateFormat('dd MMM yyyy').format(wibTime);
-    final displayName = comment.authorName.isNotEmpty ? comment.authorName : "User";
+    final displayName = comment.authorName.isNotEmpty
+        ? comment.authorName
+        : "User";
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
