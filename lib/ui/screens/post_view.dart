@@ -1,17 +1,14 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'dart:convert';
 import 'package:intl/intl.dart';
-
-// Storage Layer (Models)
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:voice_of_polban/api/feed_repository.dart';
+import 'package:voice_of_polban/processing/sync_worker.dart';
 import '../../storage/cached_post.dart';
 import '../../storage/cached_user.dart';
-import '../../storage/comment_model.dart';
 import '../../storage/local_bookmark.dart';
-
-// Processing Layer (State Managers)
+import '../../storage/comment_model.dart';
 import '../../processing/auth_controller.dart';
-import '../../processing/feed_controller.dart';
 
 class ArticlePage extends StatefulWidget {
   final String articleId;
@@ -24,8 +21,9 @@ class ArticlePage extends StatefulWidget {
 class _ArticlePageState extends State<ArticlePage> {
   CachedPost? _post;
   final AuthController _authController = AuthController();
-  final FeedController _feedController = FeedController();
+  final FeedRepository _postController = FeedRepository();
   final PageController _pageController = PageController();
+  final SyncWorker _syncController = SyncWorker();
 
   // Controller dan State untuk fitur komentar
   final TextEditingController _commentController = TextEditingController();
@@ -55,7 +53,7 @@ class _ArticlePageState extends State<ArticlePage> {
 
   Future<void> _handleVote({required bool isUpvoteTarget}) async {
     try {
-      await _feedController.castVote(
+      await _postController.castVote(
         postId: widget.articleId,
         isUpvoteTarget: isUpvoteTarget,
       );
@@ -74,7 +72,7 @@ class _ArticlePageState extends State<ArticlePage> {
     setState(() => _isLoadingComments = true);
 
     try {
-      final comments = await _feedController.loadComments(widget.articleId);
+      final comments = await _postController.fetchComments(widget.articleId);
       if (mounted) {
         setState(() {
           _comments = comments;
@@ -94,10 +92,7 @@ class _ArticlePageState extends State<ArticlePage> {
 
     setState(() => _isSubmittingComment = true);
     try {
-      await _feedController.submitComment(
-        postId: widget.articleId,
-        content: text,
-      );
+      await _postController.addComment(postId: widget.articleId, content: text);
 
       _commentController.clear();
       FocusScope.of(context).unfocus(); // Menutup keyboard
@@ -144,6 +139,7 @@ class _ArticlePageState extends State<ArticlePage> {
   void initState() {
     super.initState();
     _loadComments(); // Panggil fetch comments saat halaman dimuat
+    _syncController.syncLiveVoteCount(widget.articleId);
     _post = Hive.box<CachedPost>('cached_post_box').get(widget.articleId);
     if (_post != null) {
       final parsed = jsonDecode(_post!.cachedData) as Map<String, dynamic>;
@@ -455,7 +451,7 @@ class _ArticlePageState extends State<ArticlePage> {
                                   constraints: const BoxConstraints(),
                                   padding: EdgeInsets.zero,
                                   visualDensity: VisualDensity.compact,
-                                  onPressed: () => _feedController
+                                  onPressed: () => _postController
                                       .toggleBookmark(widget.articleId),
                                   icon: Icon(
                                     isBookmarked
@@ -578,9 +574,8 @@ class _ArticlePageState extends State<ArticlePage> {
   // Widget dinamis untuk setiap item komentar
   Widget _buildCommentItem(CommentModel comment) {
     // Format tanggal
-    final formattedDate = DateFormat(
-      'dd MMM yyyy, HH:mm',
-    ).format(comment.createdAt);
+    final wibTime = comment.createdAt.toUtc().add(const Duration(hours: 7));
+    final formattedDate = DateFormat('dd MMM yyyy').format(wibTime);
     final displayName = comment.authorName.isNotEmpty
         ? comment.authorName
         : "User";

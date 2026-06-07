@@ -1,17 +1,10 @@
 import 'package:flutter/material.dart';
-
-// Config Layer
+import 'package:voice_of_polban/ui/screens/login_view.dart';
+import 'package:voice_of_polban/processing/auth_controller.dart';
+import 'package:voice_of_polban/ui/screens/editor_view.dart';
+import 'package:voice_of_polban/ui/screens/draft_view.dart';
+import 'package:voice_of_polban/ui/screens/settings_view.dart';
 import '../../config/app_enums.dart';
-
-// Processing Layer
-import '../../processing/auth_controller.dart';
-
-// UI Layer (Screens)
-import '../screens/login_view.dart'; // Replaces the old auth_view.dart
-import '../screens/writer_view.dart';
-import '../screens/editor_view.dart';
-import '../screens/draft_view.dart';
-import '../screens/settings_view.dart';
 
 class AppSidebar extends StatelessWidget {
   final UserRole currentUserRole;
@@ -32,7 +25,7 @@ class AppSidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Header profil ──
+          // ── Header Profil ──
           Container(
             color: _card,
             padding: EdgeInsets.only(
@@ -45,6 +38,7 @@ class AppSidebar extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 28,
+                  backgroundColor: Colors.grey[800],
                   backgroundImage: avatarUrl.isNotEmpty
                       ? NetworkImage(avatarUrl)
                       : null,
@@ -56,23 +50,26 @@ class AppSidebar extends StatelessWidget {
                         )
                       : null,
                 ),
-                SizedBox(width: 14),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Selamat Datang,',
-                      style: TextStyle(color: Colors.white60, fontSize: 13),
-                    ),
-                    Text(
-                      userName,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Selamat Datang,',
+                        style: TextStyle(color: Colors.white60, fontSize: 13),
                       ),
-                    ),
-                  ],
+                      Text(
+                        userName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -80,7 +77,7 @@ class AppSidebar extends StatelessWidget {
 
           const SizedBox(height: 8),
 
-          // ── Tersimpan ──
+          // ── Menu Tersimpan ──
           _tile(
             context,
             Icons.bookmark_border,
@@ -88,28 +85,13 @@ class AppSidebar extends StatelessWidget {
             onTap: () => Navigator.pop(context),
           ),
 
-          // ── Tulis Post (writer only) ──
-          if (currentUserRole == UserRole.writer)
-            _tile(
-              context,
-              Icons.edit_outlined,
-              'Tulis Post',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const WriterPage()),
-                );
-              },
-            ),
-
-          // ── Lihat Draft: writer → DraftPage, editor → EditorPage ──
+          // ── Menu Kelola Artikel (Pengganti Lihat Draft, Tanpa Tombol Tulis di Sini) ──
           if (currentUserRole == UserRole.writer ||
               currentUserRole == UserRole.editor)
             _tile(
               context,
-              Icons.inbox_outlined,
-              'Lihat Draft',
+              Icons.article_outlined,
+              'Kelola Artikel',
               onTap: () {
                 Navigator.pop(context);
                 if (currentUserRole == UserRole.editor) {
@@ -126,7 +108,7 @@ class AppSidebar extends StatelessWidget {
               },
             ),
 
-          // ── Pengaturan ──
+          // ── Menu Pengaturan ──
           _tile(
             context,
             Icons.settings_outlined,
@@ -148,7 +130,7 @@ class AppSidebar extends StatelessWidget {
             child: Divider(color: Color(0xFF333333), height: 1),
           ),
 
-          // ── Keluar ──
+          // ── Menu Keluar ──
           _tile(
             context,
             Icons.logout,

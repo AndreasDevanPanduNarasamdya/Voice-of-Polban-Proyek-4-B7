@@ -1,16 +1,11 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
-
-// Storage Layer
-import '../../storage/local_draft.dart';
-
-// Config Layer
 import 'package:hive_flutter/hive_flutter.dart';
-
-// Processing Layer (State Managers)
-import '../../processing/studio_controller.dart';
-import '../../processing/auth_controller.dart'; // <-- ADD THIS to fix the sidebar/user role errors
+import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+
+import '../../processing/auth_controller.dart';
+import '../../processing/studio_controller.dart';
+import '../../storage/local_draft.dart';
 
 class WriterPage extends StatefulWidget {
   final String? draftId; // Add this line
@@ -22,10 +17,9 @@ class WriterPage extends StatefulWidget {
 
 class _WriterPageState extends State<WriterPage> {
   final AuthController _authController = AuthController();
+  final StudioController _postController = StudioController();
   final ImagePicker _picker = ImagePicker();
   List<String> _selectedImages = [];
-
-  final StudioController _studioController = StudioController();
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
@@ -129,14 +123,14 @@ class _WriterPageState extends State<WriterPage> {
 
       // LOGIC FIX: Check if we are updating an existing draft or creating a new one
       if (_draft != null) {
-        savedDraft = await _studioController.updateDraft(
+        savedDraft = await _postController.updateDraft(
           _draft!.localId,
           title,
           content,
           imageUrls: _selectedImages,
         );
       } else {
-        savedDraft = await _studioController.saveDraft(
+        savedDraft = await _postController.saveDraft(
           title,
           content,
           userId,
@@ -179,7 +173,7 @@ class _WriterPageState extends State<WriterPage> {
 
     setState(() => _isSubmitting = true);
     try {
-      final queueEntry = await _studioController.submitDraft(_draft!.localId);
+      final queueEntry = await _postController.submitDraft(_draft!.localId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
