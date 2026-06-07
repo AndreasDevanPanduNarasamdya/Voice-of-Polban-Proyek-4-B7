@@ -64,6 +64,17 @@ class SyncWorker {
             'author_id': payload['userId'],
             'status': payload['status'],
           });
+
+          // Declare the variable ONCE
+          final List<dynamic>? hashtags = payload['hashtags'];
+
+          // Use that same variable here
+          if (hashtags != null && hashtags.isNotEmpty) {
+            await _supabase.rpc(
+              'process_post_hashtags',
+              params: {'p_post_id': payload['postId'], 'p_hashtags': hashtags},
+            );
+          }
         } else if (task.actionType == 'UPDATE_DRAFT') {
           await _supabase
               .from('posts')

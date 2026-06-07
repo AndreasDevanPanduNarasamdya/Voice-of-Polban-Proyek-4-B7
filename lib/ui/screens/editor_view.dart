@@ -20,17 +20,17 @@ class EditorPage extends StatefulWidget {
 class _EditorPageState extends State<EditorPage> {
   final AuthController _authController = AuthController();
   late final StudioController _controller;
-  late final StudioRepository _repository_controller;
+  final StudioRepository _repository = StudioRepository();
 
   @override
   void initState() {
     super.initState();
     _controller = StudioController();
-    _repository_controller.fetchPendingPosts();
+    _repository.fetchPendingPosts();
   }
 
   Future<void> _refreshEditor() async {
-    await _repository_controller.fetchPendingPosts();
+    await _repository.fetchPendingPosts();
   }
 
   // Helper to resolve Foreign Key (authorId) to Real Name

@@ -209,12 +209,21 @@ class _DraftCardState extends State<_DraftCard> {
 
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ArticlePage(articleId: article.localId),
-          ),
-        );
+        if (article.status == PostStatus.draft || article.status == PostStatus.rejected) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => WriterPage(draftId: article.localId)),
+          );
+        } else if (article.status == PostStatus.pending) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Artikel sedang direviu')),
+          );
+        } else if (article.status == PostStatus.published) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => ArticlePage(articleId: article.localId)),
+          );
+        }
       },
       child: Container(
         decoration: const BoxDecoration(

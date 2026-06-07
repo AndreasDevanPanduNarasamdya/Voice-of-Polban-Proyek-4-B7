@@ -4,6 +4,7 @@ import 'package:voice_of_polban/processing/auth_controller.dart';
 import 'package:voice_of_polban/ui/screens/editor_view.dart';
 import 'package:voice_of_polban/ui/screens/draft_view.dart';
 import 'package:voice_of_polban/ui/screens/settings_view.dart';
+import 'package:voice_of_polban/ui/screens/bookmark_view.dart';
 import '../../config/app_enums.dart';
 
 class AppSidebar extends StatelessWidget {
@@ -82,7 +83,13 @@ class AppSidebar extends StatelessWidget {
             context,
             Icons.bookmark_border,
             'Tersimpan',
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              Navigator.pop(context); // Close the drawer
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BookmarkPage()),
+              );
+            },
           ),
 
           // ── Menu Kelola Artikel (Pengganti Lihat Draft, Tanpa Tombol Tulis di Sini) ──
