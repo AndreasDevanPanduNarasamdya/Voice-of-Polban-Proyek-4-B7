@@ -243,6 +243,43 @@ class FeedRepository {
     }
   }
 
+  Future<List<CachedPost>> searchPosts(String query) async {
+    final trimmedQuery = query.trim();
+    if (trimmedQuery.isEmpty) {
+      return <CachedPost>[];
+    }
+
+    final supabase = Supabase.instance.client;
+    try {
+      final rows = await supabase
+          .from('posts')
+          .select(
+            'post_id, title, content, author_id, status, created_at, attachments(attachment_details(file_path))',
+          )
+          .eq('status', PostStatus.published.name)
+          .or(
+            'title.ilike.%$trimmedQuery%,content.ilike.%$trimmedQuery%',
+          )
+          .order('created_at', ascending: false)
+          .limit(20);
+
+      final List<CachedPost> posts = [];
+      for (final row in rows as List) {
+        final cachedPost = _buildCachedPost(
+          Map<String, dynamic>.from(row as Map),
+        );
+        if (cachedPost == null) {
+          continue;
+        }
+        posts.add(cachedPost);
+      }
+      return posts;
+    } catch (e) {
+      debugPrint('Failed to search posts from Supabase: $e');
+      return <CachedPost>[];
+    }
+  }
+
   // ─── Comments ───────────────────────────────────────────────────────────────
 
   Future<List<CommentModel>> fetchComments(String postId) async {

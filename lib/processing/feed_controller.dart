@@ -15,9 +15,13 @@ class FeedController {
 
   bool isLoading = false;
   String? errorMessage;
+  bool isSearching = false;
 
   List<CachedPost> _feed = [];
   List<CachedPost> get feed => _feed;
+
+  List<CachedPost> _searchResults = [];
+  List<CachedPost> get searchResults => _searchResults;
 
   // ─── Feed ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +44,20 @@ class FeedController {
 
   Future<List<CachedPost>> fetchFeed() async {
     return await _repository.fetchFeed();
+  }
+
+  Future<void> search(String query) async {
+    isSearching = true;
+    _searchResults = [];
+
+    try {
+      _searchResults = await _repository.searchPosts(query);
+    } catch (e) {
+      debugPrint('FeedController.search error: $e');
+      _searchResults = [];
+    } finally {
+      isSearching = false;
+    }
   }
 
   // ─── Comments ────────────────────────────────────────────────────────────────
