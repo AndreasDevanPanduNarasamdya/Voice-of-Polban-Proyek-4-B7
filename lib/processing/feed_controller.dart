@@ -143,13 +143,19 @@ class FeedController {
 
   // Method to update search and return the filtered list
   List<CachedPost> getFilteredFeed() {
-    // 1. Filter by search query
     List<CachedPost> results = _feed.where((post) {
+      if (_searchQuery.isEmpty) return true; // ← also fixes the empty feed bug
       final data = jsonDecode(post.cachedData);
       final title = (data['title'] ?? '').toString().toLowerCase();
       final content = (data['content'] ?? '').toString().toLowerCase();
+      final List<dynamic> tags = data['hashtags'] ?? [];
+      final hashtagString = tags
+          .map((t) => t.toString().toLowerCase())
+          .join(' ');
       final query = _searchQuery.toLowerCase();
-      return title.contains(query) || content.contains(query);
+      return title.contains(query) ||
+          content.contains(query) ||
+          hashtagString.contains(query);
     }).toList();
 
     // 2. Sort results

@@ -265,14 +265,17 @@ class _HomePageState extends State<HomePage> {
                       );
                     }
 
-                    // 1. Get raw posts
-                    // 1. IMPORTANT: Update the controller's feed list with the latest data from snapshot
-                    final allPosts = snapshot.data ?? [];
-                    _controller.updateFeed(
-                      allPosts,
-                    ); // <--- Add this method to FeedController (see below)
+                    if (snapshot.hasError || !snapshot.hasData) {
+                      return const Center(
+                        child: Text(
+                          'Gagal memuat feed.',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      );
+                    }
 
-                    // 2. IMPORTANT: Use the controller's filtered feed
+                    final allPosts = snapshot.data!; // safe now
+                    _controller.updateFeed(allPosts);
                     final posts = _controller.getFilteredFeed();
 
                     if (posts.isEmpty) {
