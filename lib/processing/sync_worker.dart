@@ -4,6 +4,7 @@ import 'package:hive/hive.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../storage/sync_queue.dart';
+import '../api/feed_repository.dart';
 
 class SyncWorker {
   static final SyncWorker _instance = SyncWorker._internal();
@@ -11,6 +12,7 @@ class SyncWorker {
   SyncWorker._internal();
 
   static const String _queueBoxName = 'sync_queue_box';
+  final FeedRepository _feedRepository = FeedRepository();
 
   // --- ADDED FOR TESTABILITY ---
   @visibleForTesting
@@ -24,6 +26,20 @@ class SyncWorker {
 
   // Use the getter so we can intercept it in tests
   SupabaseClient get _supabase => mockSupabase ?? Supabase.instance.client;
+
+  String? get _currentUserId {
+    try {
+      // Use Hive.isBoxOpen to prevent crashes if the worker fires before init
+      if (Hive.isBoxOpen('session_box')) {
+        final sessionBox = Hive.box('session_box');
+        final userId = sessionBox.get('logged_in_user_id');
+        if (userId != null) return userId.toString();
+      }
+      return _supabase.auth.currentUser?.id;
+    } catch (_) {
+      return _supabase.auth.currentUser?.id;
+    }
+  }
 
   int get pendingQueueLength =>
       _queueBox.values.where((entry) => !entry.isProcessed).length;
@@ -70,5 +86,16 @@ class SyncWorker {
         debugPrint('Sync task failed (still offline?): $e');
       }
     }
+  }
+
+  Future<void> syncLiveVoteCount(String postId) async {
+    // Ambil ID user yang sedang login menggunakan getter milik SyncWorker
+    final userId = _currentUserId ?? '';
+
+    // Panggil fungsi internal yang sudah dipublikasikan di FeedRepository
+    await _feedRepository.refreshCachedPostVoteState(
+      postId: postId,
+      userId: userId,
+    );
   }
 }
