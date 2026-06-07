@@ -1,14 +1,15 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'dart:io';
+
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:voice_of_polban/processing/studio_controller.dart';
 import '../../config/app_enums.dart';
-import '../../storage/cached_user.dart';
 import '../../storage/local_draft.dart';
+import '../../storage/cached_user.dart';
+
+import '../../processing/studio_controller.dart';
 import '../../processing/auth_controller.dart';
-import '../../processing/feed_controller.dart';
+
 import 'writer_view.dart';
-import 'post_view.dart';
 
 class DraftPage extends StatefulWidget {
   const DraftPage({super.key});
@@ -136,25 +137,6 @@ class _DraftPageState extends State<DraftPage> {
           ),
         ],
       ),
-
-      // --- PENAMBAHAN TOMBOL TULIS ARTIKEL DI SINI ---
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: _orangeColor,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.edit, size: 18),
-        label: const Text(
-          'Tulis Artikel',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        ),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const WriterPage()),
-          );
-        },
-      ),
-
-      // -----------------------------------------------
       body: ValueListenableBuilder(
         valueListenable: Hive.box<LocalDraft>('local_draft_box').listenable(),
         builder: (context, Box<LocalDraft> box, _) {
@@ -180,10 +162,7 @@ class _DraftPageState extends State<DraftPage> {
             onRefresh: _syncDrafts,
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(
-                top: 4,
-                bottom: 80,
-              ), // bottom: 80 agar item terbawah tidak tertutup FAB
+              padding: const EdgeInsets.only(top: 4, bottom: 24),
               itemCount: articles.length,
               itemBuilder: (ctx, i) {
                 final draft = articles[i];
@@ -235,12 +214,27 @@ class _DraftCardState extends State<_DraftCard> {
 
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ArticlePage(articleId: article.localId),
-          ),
-        );
+        if (article.status == PostStatus.draft ||
+            article.status == PostStatus.rejected) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => WriterPage(draftId: article.localId),
+            ),
+          );
+          return;
+        }
+
+        if (article.status == PostStatus.pending) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Artikel sedang direviu')),
+          );
+          return;
+        }
+
+        if (article.status == PostStatus.published) {
+          return;
+        }
       },
       child: Container(
         decoration: const BoxDecoration(
@@ -423,6 +417,7 @@ class _DraftCardState extends State<_DraftCard> {
             ),
           ],
         );
+
       case PostStatus.published:
         return Row(
           children: [
@@ -456,6 +451,7 @@ class _DraftCardState extends State<_DraftCard> {
             ),
           ],
         );
+
       case PostStatus.dropped:
       case PostStatus.archived:
         return Row(
@@ -469,6 +465,7 @@ class _DraftCardState extends State<_DraftCard> {
             ),
           ],
         );
+
       case PostStatus.pending:
         return Row(
           mainAxisAlignment: MainAxisAlignment.end,
@@ -481,6 +478,7 @@ class _DraftCardState extends State<_DraftCard> {
             ),
           ],
         );
+
       case PostStatus.draft:
       default:
         return Row(

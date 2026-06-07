@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:io';
-import 'package:image_picker/image_picker.dart';
 
-import '../../processing/auth_controller.dart';
-import '../../processing/studio_controller.dart';
 import '../../storage/local_draft.dart';
 
+import 'package:hive_flutter/hive_flutter.dart';
+
+import '../../processing/studio_controller.dart';
+import '../../processing/auth_controller.dart';
+import 'package:image_picker/image_picker.dart';
+
 class WriterPage extends StatefulWidget {
-  final String? draftId; // Add this line
+  final String? draftId;
   const WriterPage({super.key, this.draftId});
 
   @override
@@ -17,9 +19,10 @@ class WriterPage extends StatefulWidget {
 
 class _WriterPageState extends State<WriterPage> {
   final AuthController _authController = AuthController();
-  final StudioController _postController = StudioController();
   final ImagePicker _picker = ImagePicker();
   List<String> _selectedImages = [];
+
+  final StudioController _studioController = StudioController();
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
@@ -41,15 +44,12 @@ class _WriterPageState extends State<WriterPage> {
   void initState() {
     super.initState();
     if (widget.draftId != null) {
-      // Load existing draft from local Hive box
       _draft = Hive.box<LocalDraft>('local_draft_box').get(widget.draftId);
       if (_draft != null) {
         _titleController.text = _draft!.title;
         _contentController.text = _draft!.content;
         if (_draft!.imageUrls != null) {
-          _selectedImages = List<String>.from(
-            _draft!.imageUrls!,
-          ); // Load offline images
+          _selectedImages = List<String>.from(_draft!.imageUrls!);
         }
       }
     }
@@ -121,16 +121,15 @@ class _WriterPageState extends State<WriterPage> {
     try {
       LocalDraft? savedDraft;
 
-      // LOGIC FIX: Check if we are updating an existing draft or creating a new one
       if (_draft != null) {
-        savedDraft = await _postController.updateDraft(
+        savedDraft = await _studioController.updateDraft(
           _draft!.localId,
           title,
           content,
           imageUrls: _selectedImages,
         );
       } else {
-        savedDraft = await _postController.saveDraft(
+        savedDraft = await _studioController.saveDraft(
           title,
           content,
           userId,
@@ -141,6 +140,11 @@ class _WriterPageState extends State<WriterPage> {
       if (!mounted) return;
 
       setState(() => _draft = savedDraft);
+      if (savedDraft?.imageUrls != null) {
+        setState(() {
+          _selectedImages = List<String>.from(savedDraft!.imageUrls!);
+        });
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -173,7 +177,7 @@ class _WriterPageState extends State<WriterPage> {
 
     setState(() => _isSubmitting = true);
     try {
-      final queueEntry = await _postController.submitDraft(_draft!.localId);
+      final queueEntry = await _studioController.submitDraft(_draft!.localId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

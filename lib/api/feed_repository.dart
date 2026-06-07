@@ -41,9 +41,13 @@ class FeedRepository {
 
   List<String> _extractImageUrls(Map<String, dynamic> map) {
     final attachments = map['attachments'] as List<dynamic>?;
-    if (attachments == null || attachments.isEmpty) return <String>[];
+    if (attachments == null || attachments.isEmpty) {
+      return <String>[];
+    }
     final details = attachments.first['attachment_details'] as List<dynamic>?;
-    if (details == null || details.isEmpty) return <String>[];
+    if (details == null || details.isEmpty) {
+      return <String>[];
+    }
     return details
         .map((detail) => detail['file_path'].toString())
         .where((path) => path.isNotEmpty)
@@ -51,14 +55,17 @@ class FeedRepository {
   }
 
   DateTime _parsePostDate(dynamic rawValue) {
-    if (rawValue is String)
+    if (rawValue is String) {
       return DateTime.tryParse(rawValue) ?? DateTime.now();
+    }
     return DateTime.now();
   }
 
   CachedPost? _buildCachedPost(Map<String, dynamic> map) {
     final postId = (map['post_id'] ?? '').toString();
-    if (postId.isEmpty) return null;
+    if (postId.isEmpty) {
+      return null;
+    }
 
     return CachedPost(
       postId: postId,
@@ -127,7 +134,9 @@ class FeedRepository {
         final cachedPost = _buildCachedPost(
           Map<String, dynamic>.from(row as Map),
         );
-        if (cachedPost == null) continue;
+        if (cachedPost == null) {
+          continue;
+        }
         await _cachedPostsBox.put(cachedPost.postId, cachedPost);
         cachedPosts.add(cachedPost);
       }
@@ -198,7 +207,9 @@ class FeedRepository {
       for (final row in rows) {
         final map = Map<String, dynamic>.from(row as Map);
         final postId = (map['post_id'] ?? '').toString();
-        if (postId.isEmpty) continue;
+        if (postId.isEmpty) {
+          continue;
+        }
 
         List<String> imageUrls = [];
         final attachments = map['attachments'] as List<dynamic>?;
@@ -374,8 +385,9 @@ class FeedRepository {
         final bPostId = (map['post_id'] ?? '').toString();
         final bookmarkUserId = (map['user_id'] ?? '').toString();
 
-        if (bookmarkId.isEmpty || bPostId.isEmpty || bookmarkUserId.isEmpty)
+        if (bookmarkId.isEmpty || bPostId.isEmpty || bookmarkUserId.isEmpty) {
           continue;
+        }
 
         remoteBookmarks.add(
           LocalBookmark(
