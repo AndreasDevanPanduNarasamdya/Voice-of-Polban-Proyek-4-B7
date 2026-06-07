@@ -1,23 +1,16 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:intl/intl.dart';
-import '../../processing/sync_worker.dart';
-// Storage Layer (Models)
+import 'package:intl/intl.dart'; // Used for formatting real dates
 import '../../storage/cached_post.dart';
 import '../../storage/cached_user.dart';
 import '../../storage/local_bookmark.dart';
-
-// Config Layer
 import '../../config/app_enums.dart';
-
-// Processing Layer (State Managers)
-import '../../processing/auth_controller.dart'; // Updated path
-import '../../processing/feed_controller.dart'; // Replaces post_controller.dart
-
-// UI Layer (Widgets & Other Screens)
-import '../widgets/sidebar.dart';
-import 'post_view.dart'; // Ensure post_view.dart is renamed to article_view.dart to match the architecture
+import '../../processing/feed_controller.dart';
+import '../../processing/sync_worker.dart';
+import '../../processing/auth_controller.dart';
+import 'package:voice_of_polban/ui/widgets/sidebar.dart';
+import 'post_view.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -29,6 +22,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final AuthController _authController = AuthController();
   final FeedController _controller = FeedController();
+  final SyncWorker _syncWorker = SyncWorker();
   late Future<List<CachedPost>> _onlineFeed;
 
   int _readUpvoteCount(Map<String, dynamic> parsed) {
@@ -47,6 +41,23 @@ class _HomePageState extends State<HomePage> {
     }
     return false;
   }
+
+  // int _readUpvoteCount(Map<String, dynamic> parsed) {
+  //   final raw = parsed['upvote_count'];
+  //   if (raw is int) return raw;
+  //   if (raw is num) return raw.toInt();
+  //   if (raw is String) return int.tryParse(raw) ?? 0;
+  //   return 0;
+  // }
+
+  // bool _readBoolFlag(Map<String, dynamic> parsed, String key) {
+  //   final raw = parsed[key];
+  //   if (raw is bool) return raw;
+  //   if (raw is String) {
+  //     return raw.toLowerCase() == 'true';
+  //   }
+  //   return false;
+  // }
 
   Future<void> _handleVote({
     required String postId,
@@ -70,7 +81,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _onlineFeed = _controller.fetchFeed();
-    SyncWorker().processSyncQueue();
+    _syncWorker.processSyncQueue();
   }
 
   Future<void> _refreshFeed() async {
@@ -322,7 +333,10 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildInteractionPillGroup(String postId) {
     return ValueListenableBuilder<Box<CachedPost>>(
-      valueListenable: Hive.box<CachedPost>('cached_post_box').listenable(),
+      // Menambahkan filter `keys` agar widget hanya rebuild jika postId yang sesuai berubah
+      valueListenable: Hive.box<CachedPost>(
+        'cached_post_box',
+      ).listenable(keys: [postId]),
       builder: (context, postBox, _) {
         final livePost = postBox.get(postId);
         final parsed = livePost == null
