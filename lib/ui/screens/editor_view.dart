@@ -282,25 +282,7 @@ class _EditorPageState extends State<EditorPage> {
           icon: const Icon(Icons.arrow_back_ios, color: Color(0xFFFF8C00)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: RichText(
-          text: const TextSpan(
-            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-            children: [
-              TextSpan(
-                text: 'V',
-                style: TextStyle(color: Color(0xFFFF6D00)),
-              ),
-              TextSpan(
-                text: 'O',
-                style: TextStyle(color: Colors.white),
-              ),
-              TextSpan(
-                text: 'P',
-                style: TextStyle(color: Color(0xFFFF6D00)),
-              ),
-            ],
-          ),
-        ),
+        title: Image.asset('assets/Logo_VOP.png', height: 32),
         centerTitle: true,
         actions: [
           Padding(

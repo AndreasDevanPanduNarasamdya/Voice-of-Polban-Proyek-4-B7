@@ -67,14 +67,9 @@ class _LoginState extends State<LoginView> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  "VOP",
-                  style: TextStyle(
-                    fontSize: 64,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w400,
-                  ),
-                  textAlign: TextAlign.center,
+                Image.asset(
+                  'assets/Logo_VOP.png',
+                  height: 100,
                 ),
                 const SizedBox(height: 60),
 

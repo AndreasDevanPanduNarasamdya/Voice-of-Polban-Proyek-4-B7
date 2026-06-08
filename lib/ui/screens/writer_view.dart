@@ -243,14 +243,9 @@ class _WriterPageState extends State<WriterPage> {
           icon: const Icon(Icons.arrow_back_ios, color: Color(0xFFFF8C00)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'VOP',
-          style: TextStyle(
-            color: Color(0xFF000080),
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 2,
-          ),
+        title: Image.asset(
+          'assets/Logo_VOP.png',
+          height: 32,
         ),
         centerTitle: true,
       ),

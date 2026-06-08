@@ -148,6 +148,8 @@ class _HomePageState extends State<HomePage> {
             backgroundColor: const Color(0xFF121212),
             elevation: 0,
             iconTheme: const IconThemeData(color: Color(0xFFFF8C00)),
+            title: Image.asset('assets/Logo_VOP.png', height: 32),
+            centerTitle: true,
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 16.0),
@@ -408,7 +410,7 @@ class _HomePageState extends State<HomePage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _buildInteractionPill(Icons.chat_bubble_outline, "30"),
+                  _buildReactiveCommentPill(post.postId),
                   const SizedBox(width: 12),
                   _buildInteractionPillGroup(post.postId),
                 ],
@@ -441,6 +443,28 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildReactiveCommentPill(String postId) {
+    return ValueListenableBuilder<Box<CachedPost>>(
+      valueListenable: Hive.box<CachedPost>(
+        'cached_post_box',
+      ).listenable(keys: [postId]),
+      builder: (context, postBox, _) {
+        final livePost = postBox.get(postId);
+        final parsed = livePost == null
+            ? <String, dynamic>{}
+            : Map<String, dynamic>.from(jsonDecode(livePost.cachedData) as Map);
+
+        final raw = parsed['comment_count'];
+        int commentCount = 0;
+        if (raw is int) commentCount = raw;
+        else if (raw is num) commentCount = raw.toInt();
+        else if (raw is String) commentCount = int.tryParse(raw) ?? 0;
+
+        return _buildInteractionPill(Icons.chat_bubble_outline, commentCount.toString());
+      },
     );
   }
 

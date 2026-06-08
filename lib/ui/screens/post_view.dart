@@ -191,6 +191,8 @@ class _ArticlePageState extends State<ArticlePage> {
             icon: const Icon(Icons.arrow_back_ios, color: Color(0xFFFF8C00)),
             onPressed: () => Navigator.pop(context),
           ),
+          title: Image.asset('assets/Logo_VOP.png', height: 32),
+          centerTitle: true,
         ),
         body: const Center(
           child: Text(
@@ -221,6 +223,8 @@ class _ArticlePageState extends State<ArticlePage> {
           icon: const Icon(Icons.arrow_back_ios, color: Color(0xFFFF8C00)),
           onPressed: () => Navigator.pop(context),
         ),
+        title: Image.asset('assets/Logo_VOP.png', height: 32),
+        centerTitle: true,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
