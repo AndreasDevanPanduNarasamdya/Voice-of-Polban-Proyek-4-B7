@@ -18,22 +18,39 @@ class FeedRepository {
 
   final Uuid _uuid = const Uuid();
 
+  // --- ADDED FOR TESTABILITY ---
+  @visibleForTesting
+  Box<CachedPost>? mockCachedPostsBox;
+  @visibleForTesting
+  Box<LocalBookmark>? mockBookmarkBox;
+  @visibleForTesting
+  Box<LocalVote>? mockVoteBox;
+  @visibleForTesting
+  SupabaseClient? mockSupabase;
+  @visibleForTesting
+  String? mockUserId;
+  // -----------------------------
+
+  SupabaseClient get _supabase => mockSupabase ?? Supabase.instance.client;
+
   Box<CachedPost> get _cachedPostsBox =>
-      Hive.box<CachedPost>(_cachedPostsBoxName);
+      mockCachedPostsBox ?? Hive.box<CachedPost>(_cachedPostsBoxName);
   Box<LocalBookmark> get _bookmarkBox =>
-      Hive.box<LocalBookmark>(_bookmarkBoxName);
-  Box<LocalVote> get _voteBox => Hive.box<LocalVote>(_voteBoxName);
+      mockBookmarkBox ?? Hive.box<LocalBookmark>(_bookmarkBoxName);
+  Box<LocalVote> get _voteBox =>
+      mockVoteBox ?? Hive.box<LocalVote>(_voteBoxName);
 
   String? get _currentUserId {
+    if (mockUserId != null) return mockUserId;
     try {
-      final sessionBox = Hive.box('session_box');
-      final userId = sessionBox.get('logged_in_user_id');
-      if (userId == null) {
-        return Supabase.instance.client.auth.currentUser?.id;
+      if (Hive.isBoxOpen('session_box')) {
+        final sessionBox = Hive.box('session_box');
+        final userId = sessionBox.get('logged_in_user_id');
+        if (userId != null) return userId.toString();
       }
-      return userId.toString();
+      return _supabase.auth.currentUser?.id;
     } catch (_) {
-      return Supabase.instance.client.auth.currentUser?.id;
+      return _supabase.auth.currentUser?.id;
     }
   }
 
@@ -84,7 +101,7 @@ class FeedRepository {
 
   Future<CachedPost?> _fetchAndCachePostById(String postId) async {
     if (postId.trim().isEmpty) return null;
-    final supabase = Supabase.instance.client;
+    final supabase = _supabase;
     try {
       final row = await supabase
           .from('posts')
@@ -120,7 +137,7 @@ class FeedRepository {
 
     if (uniquePostIds.isEmpty) return <CachedPost>[];
 
-    final supabase = Supabase.instance.client;
+    final supabase = _supabase;
     try {
       final rows = await supabase
           .from('posts')
@@ -156,7 +173,7 @@ class FeedRepository {
     if (authorIds.isEmpty) return;
 
     try {
-      final userRows = await Supabase.instance.client
+      final userRows = await _supabase
           .from('users')
           .select('user_id, name, avatar_url, role')
           .inFilter('user_id', authorIds);
@@ -190,7 +207,7 @@ class FeedRepository {
       _cachedPostsBox.values.toList(growable: false);
 
   Future<List<CachedPost>> fetchFeed() async {
-    final supabase = Supabase.instance.client;
+    final supabase = _supabase;
     try {
       final rows = await supabase
           .from('posts')
@@ -249,7 +266,7 @@ class FeedRepository {
       return <CachedPost>[];
     }
 
-    final supabase = Supabase.instance.client;
+    final supabase = _supabase;
     try {
       final rows = await supabase
           .from('posts')
@@ -287,7 +304,7 @@ class FeedRepository {
     if (trimmedPostId.isEmpty) return <CommentModel>[];
 
     try {
-      final rows = await Supabase.instance.client
+      final rows = await _supabase
           .from('comments')
           .select('*, users(name)')
           .eq('post_id', trimmedPostId)
@@ -316,7 +333,7 @@ class FeedRepository {
     if (trimmedPostId.isEmpty) throw ArgumentError('postId cannot be empty.');
     if (trimmedContent.isEmpty) throw ArgumentError('content cannot be empty.');
 
-    await Supabase.instance.client.from('comments').insert({
+    await _supabase.from('comments').insert({
       'post_id': trimmedPostId,
       'user_id': userId,
       'content': trimmedContent,
@@ -344,8 +361,10 @@ class FeedRepository {
 
   Future<void> toggleBookmark(String postId) async {
     final userId = _currentUserId;
-    if (userId == null || postId.trim().isEmpty) {
-      debugPrint('toggleBookmark skipped: missing user or post id.');
+    if (userId == null) {
+      throw Exception('Guests cannot bookmark. Please sign in first.');
+    }
+    if (postId.trim().isEmpty) {
       return;
     }
 
@@ -354,7 +373,7 @@ class FeedRepository {
       orElse: () => null,
     );
 
-    final supabase = Supabase.instance.client;
+    final supabase = _supabase;
 
     if (existingEntry != null) {
       try {
@@ -406,7 +425,7 @@ class FeedRepository {
       return;
     }
 
-    final supabase = Supabase.instance.client;
+    final supabase = _supabase;
     try {
       final rows = await supabase
           .from('bookmarks')
@@ -477,7 +496,7 @@ class FeedRepository {
       orElse: () => null,
     );
 
-    final supabase = Supabase.instance.client;
+    final supabase = _supabase;
 
     // Case A: same vote again → retract
     if (existingLocalVote != null &&
@@ -566,7 +585,7 @@ class FeedRepository {
 
     int upvoteCount;
     try {
-      final count = await Supabase.instance.client
+      final count = await _supabase
           .from('votes')
           .count(CountOption.exact)
           .eq('post_id', postId)
