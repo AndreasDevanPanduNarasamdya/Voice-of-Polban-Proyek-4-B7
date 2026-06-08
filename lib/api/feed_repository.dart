@@ -91,6 +91,7 @@ class FeedRepository {
         'content': (map['content'] ?? '').toString(),
         'author_id': map['author_id']?.toString() ?? '',
         'imageUrls': _extractImageUrls(map),
+        'hashtags': _extractHashtags(map),
         'status': (map['status'] ?? PostStatus.published.name).toString(),
         if (map['rejection_note'] != null)
           'rejection_note': map['rejection_note'].toString(),
@@ -105,9 +106,11 @@ class FeedRepository {
     try {
       final row = await supabase
           .from('posts')
-          .select(
-            'post_id, title, content, author_id, status, created_at, rejection_note, attachments(attachment_details(file_path))',
-          )
+          .select('''
+            post_id, title, content, author_id, status, created_at, rejection_note, 
+            attachments(attachment_details(file_path)),
+            hashtags:post_hashtags(hashtags(name))
+          ''')
           .eq('post_id', postId)
           .maybeSingle();
 
@@ -141,9 +144,11 @@ class FeedRepository {
     try {
       final rows = await supabase
           .from('posts')
-          .select(
-            'post_id, title, content, author_id, status, created_at, rejection_note, attachments(attachment_details(file_path))',
-          )
+          .select('''
+            post_id, title, content, author_id, status, created_at, rejection_note, 
+            attachments(attachment_details(file_path)),
+            hashtags:post_hashtags(hashtags(name))
+          ''')
           .inFilter('post_id', uniquePostIds);
 
       final List<CachedPost> cachedPosts = [];
@@ -211,9 +216,11 @@ class FeedRepository {
     try {
       final rows = await supabase
           .from('posts')
-          .select(
-            'post_id, title, content, author_id, status, created_at, attachments(attachment_details(file_path))',
-          )
+          .select('''
+            post_id, title, content, author_id, status, created_at, 
+            attachments(attachment_details(file_path)),
+            hashtags:post_hashtags(hashtags(name))
+          ''')
           .eq('status', PostStatus.published.name)
           .order('created_at', ascending: false);
 
@@ -238,17 +245,8 @@ class FeedRepository {
           }
         }
 
-        final cachedPost = CachedPost(
-          postId: postId,
-          cachedData: jsonEncode({
-            'title': (map['title'] ?? '').toString(),
-            'content': (map['content'] ?? '').toString(),
-            'author_id': map['author_id']?.toString() ?? '',
-            'imageUrls': imageUrls,
-            'status': PostStatus.published.name,
-          }),
-          cachedAt: _parsePostDate(map['created_at']),
-        );
+        final cachedPost = _buildCachedPost(map);
+        if (cachedPost == null) continue;
 
         await _cachedPostsBox.put(postId, cachedPost);
         posts.add(cachedPost);
@@ -274,9 +272,7 @@ class FeedRepository {
             'post_id, title, content, author_id, status, created_at, attachments(attachment_details(file_path))',
           )
           .eq('status', PostStatus.published.name)
-          .or(
-            'title.ilike.%$trimmedQuery%,content.ilike.%$trimmedQuery%',
-          )
+          .or('title.ilike.%$trimmedQuery%,content.ilike.%$trimmedQuery%')
           .order('created_at', ascending: false)
           .limit(20);
 
@@ -338,6 +334,16 @@ class FeedRepository {
       'user_id': userId,
       'content': trimmedContent,
     });
+
+    final cachedPost = _cachedPostsBox.get(trimmedPostId);
+    if (cachedPost != null) {
+      final data = Map<String, dynamic>.from(jsonDecode(cachedPost.cachedData) as Map);
+      final currentCount = data['comment_count'] ?? 0;
+      data['comment_count'] = (currentCount is num ? currentCount.toInt() : int.tryParse(currentCount.toString()) ?? 0) + 1;
+      cachedPost.cachedData = jsonEncode(data);
+      cachedPost.cachedAt = DateTime.now();
+      await _cachedPostsBox.put(trimmedPostId, cachedPost);
+    }
   }
 
   // ─── Bookmarks ──────────────────────────────────────────────────────────────
@@ -603,15 +609,58 @@ class FeedRepository {
       orElse: () => null,
     );
 
+    int commentCount = 0;
+    try {
+      final cCount = await Supabase.instance.client
+          .from('comments')
+          .count(CountOption.exact)
+          .eq('post_id', postId);
+      commentCount = cCount;
+    } catch (e) {
+      debugPrint('Failed to fetch remote comment count for $postId: $e');
+    }
+
     final data = Map<String, dynamic>.from(
       jsonDecode(cachedPost.cachedData) as Map,
     );
+    final existingHashtags = data['hashtags'] as List?;
+    if (existingHashtags == null || existingHashtags.isEmpty) {
+      // Re-fetch the full post so hashtags get populated properly
+      await _fetchAndCachePostById(postId);
+      // Then re-read the freshly cached post and patch it
+      final freshPost = _cachedPostsBox.get(postId);
+      if (freshPost == null) return;
+      final freshData = Map<String, dynamic>.from(
+        jsonDecode(freshPost.cachedData) as Map,
+      );
+      freshData['upvote_count'] = upvoteCount;
+      freshData['comment_count'] = commentCount;
+      freshData['is_upvoted_by_me'] = localUserVote?.upvoteStatus == true;
+      freshData['is_downvoted_by_me'] = localUserVote?.upvoteStatus == false;
+      freshPost.cachedData = jsonEncode(freshData);
+      freshPost.cachedAt = DateTime.now();
+      await _cachedPostsBox.put(postId, freshPost);
+      return;
+    }
     data['upvote_count'] = upvoteCount;
+    data['comment_count'] = commentCount;
     data['is_upvoted_by_me'] = localUserVote?.upvoteStatus == true;
     data['is_downvoted_by_me'] = localUserVote?.upvoteStatus == false;
 
     cachedPost.cachedData = jsonEncode(data);
     cachedPost.cachedAt = DateTime.now();
     await _cachedPostsBox.put(postId, cachedPost);
+  }
+
+  List<String> _extractHashtags(Map<String, dynamic> map) {
+    final postHashtags = map['hashtags'] as List<dynamic>?;
+    if (postHashtags == null || postHashtags.isEmpty) {
+      return <String>[];
+    }
+    // This assumes your select query is: hashtags:post_hashtags(hashtags(name))
+    return postHashtags
+        .map((ph) => ph['hashtags']['name'].toString())
+        .where((name) => name.isNotEmpty)
+        .toList(growable: false);
   }
 }

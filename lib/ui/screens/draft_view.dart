@@ -90,25 +90,7 @@ class _DraftPageState extends State<DraftPage> {
           icon: const Icon(Icons.arrow_back_ios, color: _orangeColor, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: RichText(
-          text: const TextSpan(
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-            children: [
-              TextSpan(
-                text: 'V',
-                style: TextStyle(color: Color(0xFFFF6D00)),
-              ),
-              TextSpan(
-                text: 'o',
-                style: TextStyle(color: Colors.white),
-              ),
-              TextSpan(
-                text: 'P',
-                style: TextStyle(color: Color(0xFFFF6D00)),
-              ),
-            ],
-          ),
-        ),
+        title: Image.asset('assets/Logo_VOP.png', height: 32),
         centerTitle: true,
         actions: [
           Padding(

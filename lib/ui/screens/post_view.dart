@@ -191,6 +191,8 @@ class _ArticlePageState extends State<ArticlePage> {
             icon: const Icon(Icons.arrow_back_ios, color: Color(0xFFFF8C00)),
             onPressed: () => Navigator.pop(context),
           ),
+          title: Image.asset('assets/Logo_VOP.png', height: 32),
+          centerTitle: true,
         ),
         body: const Center(
           child: Text(
@@ -209,6 +211,8 @@ class _ArticlePageState extends State<ArticlePage> {
     final dateString = DateFormat('EEEE, dd MMMM yyyy').format(p.cachedAt);
     final authorName = _getAuthorName(authorId);
     final authorAvatar = _getAuthorAvatar(authorId);
+    final hashtags =
+        (parsed['hashtags'] as List<dynamic>?)?.cast<String>() ?? [];
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -219,6 +223,8 @@ class _ArticlePageState extends State<ArticlePage> {
           icon: const Icon(Icons.arrow_back_ios, color: Color(0xFFFF8C00)),
           onPressed: () => Navigator.pop(context),
         ),
+        title: Image.asset('assets/Logo_VOP.png', height: 32),
+        centerTitle: true,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
@@ -349,6 +355,32 @@ class _ArticlePageState extends State<ArticlePage> {
               ),
             ),
 
+            // Hashtags (Hanya tampil jika ada hashtag)
+            if (hashtags.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Wrap(
+                  spacing: 8.0, // Jarak horizontal antar hashtag
+                  runSpacing:
+                      4.0, // Jarak vertikal jika hashtag turun ke baris baru
+                  children: hashtags
+                      .map(
+                        (tag) => Text(
+                          '#$tag',
+                          style: const TextStyle(
+                            color: Color(
+                              0xFFFF8C00,
+                            ), // Menggunakan warna oranye tema VOP
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+
+            const SizedBox(height: 8), // Sedikit jarak sebelum tombol like
             // Interaction Bar
             ValueListenableBuilder<Box<CachedPost>>(
               valueListenable: Hive.box<CachedPost>(

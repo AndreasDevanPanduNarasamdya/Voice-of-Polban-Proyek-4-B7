@@ -13,6 +13,8 @@ enum UserRole {
   editor,
 }
 
+enum SortMode { terbaru, terlama, populer }
+
 @HiveType(typeId: 9)
 enum PostStatus {
   @HiveField(0)

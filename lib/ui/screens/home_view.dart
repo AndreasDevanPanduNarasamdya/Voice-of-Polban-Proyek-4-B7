@@ -23,7 +23,14 @@ class _HomePageState extends State<HomePage> {
   final AuthController _authController = AuthController();
   final FeedController _controller = FeedController();
   final SyncWorker _syncWorker = SyncWorker();
+  final TextEditingController _searchController = TextEditingController();
   late Future<List<CachedPost>> _onlineFeed;
+
+  void _onSearchChanged(String value) {
+    setState(() {
+      _controller.updateSearchQuery(value);
+    });
+  }
 
   int _readUpvoteCount(Map<String, dynamic> parsed) {
     final raw = parsed['upvote_count'];
@@ -141,6 +148,8 @@ class _HomePageState extends State<HomePage> {
             backgroundColor: const Color(0xFF121212),
             elevation: 0,
             iconTheme: const IconThemeData(color: Color(0xFFFF8C00)),
+            title: Image.asset('assets/Logo_VOP.png', height: 32),
+            centerTitle: true,
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 16.0),
@@ -153,53 +162,145 @@ class _HomePageState extends State<HomePage> {
           ),
 
           // 2. REACTIVE FEED: Listens to new articles/publications instantly
-          body: FutureBuilder<List<CachedPost>>(
-            future: _onlineFeed,
-            builder: (context, snapshot) {
-              // Show a loading spinner while communicating with the database
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
-                  child: CircularProgressIndicator(color: Color(0xFFFF8C00)),
-                );
-              }
-              final posts = snapshot.data ?? [];
-
-              if (posts.isEmpty) {
-                return RefreshIndicator(
-                  color: const Color(0xFFFF8C00),
-                  backgroundColor: const Color(0xFF1E1E1E),
-                  onRefresh: _refreshFeed, // Triggers network call
-                  child: ListView(
-                    physics:
-                        const AlwaysScrollableScrollPhysics(), // Forces pull-to-refresh to activate
-                    children: const [
-                      SizedBox(height: 150),
-                      Center(
-                        child: Text(
-                          "Belum ada artikel yang dipublikasikan.",
-                          style: TextStyle(color: Colors.white),
+          body: Column(
+            children: [
+              Container(
+                color: const Color(0xFF1A1A1A),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 12.0,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF121212),
+                          borderRadius: BorderRadius.circular(22.0),
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: (value) => setState(() {
+                            _controller.updateSearchQuery(value);
+                          }),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                          decoration: const InputDecoration(
+                            hintText: 'Cari Postingan',
+                            hintStyle: TextStyle(
+                              color: Colors.white38,
+                              fontSize: 14,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.search,
+                              color: Colors.white38,
+                              size: 20,
+                            ),
+                            border: InputBorder.none,
+                          ),
                         ),
                       ),
-                    ],
-                  ),
-                );
-              }
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      height: 44,
+                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF121212),
+                        borderRadius: BorderRadius.circular(22.0),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<SortMode>(
+                          value: _controller
+                              .sortMode, // Make sure you added sortMode to your Controller
+                          dropdownColor: const Color(0xFF1E1E1E),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down,
+                            color: Color(0xFFFF8C00),
+                          ),
+                          onChanged: (SortMode? mode) {
+                            if (mode != null) {
+                              setState(() => _controller.updateSortMode(mode));
+                            }
+                          },
+                          items: const [
+                            DropdownMenuItem(
+                              value: SortMode.terbaru,
+                              child: Text(
+                                "Terbaru",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: SortMode.terlama,
+                              child: Text(
+                                "Terlama",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: SortMode.populer,
+                              child: Text(
+                                "Populer",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: FutureBuilder<List<CachedPost>>(
+                  future: _onlineFeed,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFFFF8C00),
+                        ),
+                      );
+                    }
 
-              return RefreshIndicator(
-                color: const Color(0xFFFF8C00),
-                backgroundColor: const Color(0xFF1E1E1E),
-                onRefresh: _refreshFeed, // Triggers the network call again
-                child: ListView.builder(
-                  // physics is required to ensure pull-to-refresh works even if the list is short
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: posts.length,
-                  itemBuilder: (context, index) {
-                    final post = posts[index];
-                    return _buildArticleCard(context, post);
+                    if (snapshot.hasError || !snapshot.hasData) {
+                      return const Center(
+                        child: Text(
+                          'Gagal memuat feed.',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      );
+                    }
+
+                    final allPosts = snapshot.data!; // safe now
+                    _controller.updateFeed(allPosts);
+                    final posts = _controller.getFilteredFeed();
+
+                    if (posts.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          "Tidak ada hasil.",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      );
+                    }
+
+                    return RefreshIndicator(
+                      onRefresh: _refreshFeed,
+                      child: ListView.builder(
+                        itemCount: posts.length,
+                        itemBuilder: (context, index) =>
+                            _buildArticleCard(context, posts[index]),
+                      ),
+                    );
                   },
                 ),
-              );
-            },
+              ),
+            ],
           ),
 
           // bottomNavigationBar: Container(
@@ -309,7 +410,7 @@ class _HomePageState extends State<HomePage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _buildInteractionPill(Icons.chat_bubble_outline, "30"),
+                  _buildReactiveCommentPill(post.postId),
                   const SizedBox(width: 12),
                   _buildInteractionPillGroup(post.postId),
                 ],
@@ -342,6 +443,28 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildReactiveCommentPill(String postId) {
+    return ValueListenableBuilder<Box<CachedPost>>(
+      valueListenable: Hive.box<CachedPost>(
+        'cached_post_box',
+      ).listenable(keys: [postId]),
+      builder: (context, postBox, _) {
+        final livePost = postBox.get(postId);
+        final parsed = livePost == null
+            ? <String, dynamic>{}
+            : Map<String, dynamic>.from(jsonDecode(livePost.cachedData) as Map);
+
+        final raw = parsed['comment_count'];
+        int commentCount = 0;
+        if (raw is int) commentCount = raw;
+        else if (raw is num) commentCount = raw.toInt();
+        else if (raw is String) commentCount = int.tryParse(raw) ?? 0;
+
+        return _buildInteractionPill(Icons.chat_bubble_outline, commentCount.toString());
+      },
     );
   }
 
