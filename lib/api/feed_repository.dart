@@ -18,22 +18,42 @@ class FeedRepository {
 
   final Uuid _uuid = const Uuid();
 
+  // --- ADDED FOR TESTABILITY ---
+  @visibleForTesting
+  Box<CachedPost>? mockCachedPostsBox;
+  @visibleForTesting
+  Box<LocalBookmark>? mockBookmarkBox;
+  @visibleForTesting
+  Box<LocalVote>? mockVoteBox;
+  @visibleForTesting
+  SupabaseClient? mockSupabase;
+  @visibleForTesting
+  String? mockUserId;
+  // -----------------------------
+
+  SupabaseClient get _supabase => mockSupabase ?? Supabase.instance.client;
+
   Box<CachedPost> get _cachedPostsBox =>
-      Hive.box<CachedPost>(_cachedPostsBoxName);
+      mockCachedPostsBox ?? Hive.box<CachedPost>(_cachedPostsBoxName);
   Box<LocalBookmark> get _bookmarkBox =>
-      Hive.box<LocalBookmark>(_bookmarkBoxName);
-  Box<LocalVote> get _voteBox => Hive.box<LocalVote>(_voteBoxName);
+      mockBookmarkBox ?? Hive.box<LocalBookmark>(_bookmarkBoxName);
+  Box<LocalVote> get _voteBox =>
+      mockVoteBox ?? Hive.box<LocalVote>(_voteBoxName);
 
   String? get _currentUserId {
+    // 🚨 1. Return the mock user ID immediately if testing
+    if (mockUserId != null) return mockUserId;
+
     try {
-      final sessionBox = Hive.box('session_box');
-      final userId = sessionBox.get('logged_in_user_id');
-      if (userId == null) {
-        return Supabase.instance.client.auth.currentUser?.id;
+      if (Hive.isBoxOpen('session_box')) {
+        final sessionBox = Hive.box('session_box');
+        final userId = sessionBox.get('logged_in_user_id');
+        if (userId != null) return userId.toString();
       }
-      return userId.toString();
+      // 🚨 2. Route fallback through the testable _supabase getter
+      return _supabase.auth.currentUser?.id;
     } catch (_) {
-      return Supabase.instance.client.auth.currentUser?.id;
+      return _supabase.auth.currentUser?.id;
     }
   }
 
@@ -85,9 +105,10 @@ class FeedRepository {
 
   Future<CachedPost?> _fetchAndCachePostById(String postId) async {
     if (postId.trim().isEmpty) return null;
-    final supabase = Supabase.instance.client;
+
+    // 🚨 FIX: Routed through testable getter
     try {
-      final row = await supabase
+      final row = await _supabase
           .from('posts')
           .select('''
             post_id, title, content, author_id, status, created_at, rejection_note, 
@@ -123,9 +144,9 @@ class FeedRepository {
 
     if (uniquePostIds.isEmpty) return <CachedPost>[];
 
-    final supabase = Supabase.instance.client;
+    // 🚨 FIX: Routed through testable getter
     try {
-      final rows = await supabase
+      final rows = await _supabase
           .from('posts')
           .select('''
             post_id, title, content, author_id, status, created_at, rejection_note, 
@@ -160,8 +181,9 @@ class FeedRepository {
 
     if (authorIds.isEmpty) return;
 
+    // 🚨 FIX: Routed through testable getter
     try {
-      final userRows = await Supabase.instance.client
+      final userRows = await _supabase
           .from('users')
           .select('user_id, name, avatar_url, role')
           .inFilter('user_id', authorIds);
@@ -195,9 +217,9 @@ class FeedRepository {
       _cachedPostsBox.values.toList(growable: false);
 
   Future<List<CachedPost>> fetchFeed() async {
-    final supabase = Supabase.instance.client;
+    // 🚨 FIX: Routed through testable getter
     try {
-      final rows = await supabase
+      final rows = await _supabase
           .from('posts')
           .select('''
             post_id, title, content, author_id, status, created_at, 
@@ -247,9 +269,9 @@ class FeedRepository {
       return <CachedPost>[];
     }
 
-    final supabase = Supabase.instance.client;
+    // 🚨 FIX: Routed through testable getter
     try {
-      final rows = await supabase
+      final rows = await _supabase
           .from('posts')
           .select(
             'post_id, title, content, author_id, status, created_at, attachments(attachment_details(file_path))',
@@ -282,8 +304,9 @@ class FeedRepository {
     final trimmedPostId = postId.trim();
     if (trimmedPostId.isEmpty) return <CommentModel>[];
 
+    // 🚨 FIX: Routed through testable getter
     try {
-      final rows = await Supabase.instance.client
+      final rows = await _supabase
           .from('comments')
           .select('*, users(name)')
           .eq('post_id', trimmedPostId)
@@ -312,7 +335,8 @@ class FeedRepository {
     if (trimmedPostId.isEmpty) throw ArgumentError('postId cannot be empty.');
     if (trimmedContent.isEmpty) throw ArgumentError('content cannot be empty.');
 
-    await Supabase.instance.client.from('comments').insert({
+    // 🚨 FIX: Routed through testable getter
+    await _supabase.from('comments').insert({
       'post_id': trimmedPostId,
       'user_id': userId,
       'content': trimmedContent,
@@ -320,9 +344,15 @@ class FeedRepository {
 
     final cachedPost = _cachedPostsBox.get(trimmedPostId);
     if (cachedPost != null) {
-      final data = Map<String, dynamic>.from(jsonDecode(cachedPost.cachedData) as Map);
+      final data = Map<String, dynamic>.from(
+        jsonDecode(cachedPost.cachedData) as Map,
+      );
       final currentCount = data['comment_count'] ?? 0;
-      data['comment_count'] = (currentCount is num ? currentCount.toInt() : int.tryParse(currentCount.toString()) ?? 0) + 1;
+      data['comment_count'] =
+          (currentCount is num
+              ? currentCount.toInt()
+              : int.tryParse(currentCount.toString()) ?? 0) +
+          1;
       cachedPost.cachedData = jsonEncode(data);
       cachedPost.cachedAt = DateTime.now();
       await _cachedPostsBox.put(trimmedPostId, cachedPost);
@@ -360,11 +390,10 @@ class FeedRepository {
       orElse: () => null,
     );
 
-    final supabase = Supabase.instance.client;
-
     if (existingEntry != null) {
       try {
-        await supabase
+        // 🚨 FIX: Routed through testable getter
+        await _supabase
             .from('bookmarks')
             .delete()
             .eq('user_id', userId)
@@ -378,7 +407,8 @@ class FeedRepository {
 
     String bookmarkId = _uuid.v4();
     try {
-      final inserted = await supabase
+      // 🚨 FIX: Routed through testable getter
+      final inserted = await _supabase
           .from('bookmarks')
           .insert({'user_id': userId, 'post_id': postId})
           .select('bookmark_id')
@@ -412,9 +442,9 @@ class FeedRepository {
       return;
     }
 
-    final supabase = Supabase.instance.client;
+    // 🚨 FIX: Routed through testable getter
     try {
-      final rows = await supabase
+      final rows = await _supabase
           .from('bookmarks')
           .select('bookmark_id, post_id, user_id')
           .eq('user_id', userId);
@@ -483,18 +513,17 @@ class FeedRepository {
       orElse: () => null,
     );
 
-    final supabase = Supabase.instance.client;
-
     // Case A: same vote again → retract
     if (existingLocalVote != null &&
         existingLocalVote.upvoteStatus == isUpvoteTarget) {
       try {
-        await supabase
+        // 🚨 FIX: Routed through testable getter
+        await _supabase
             .from('votes')
             .delete()
             .eq('vote_id', existingLocalVote.voteId);
       } catch (_) {
-        await supabase
+        await _supabase
             .from('votes')
             .delete()
             .eq('user_id', userId)
@@ -509,7 +538,8 @@ class FeedRepository {
     if (existingLocalVote == null) {
       String voteId = _uuid.v4();
       try {
-        final inserted = await supabase
+        // 🚨 FIX: Routed through testable getter
+        final inserted = await _supabase
             .from('votes')
             .insert({
               'post_id': trimmedPostId,
@@ -545,12 +575,13 @@ class FeedRepository {
 
     // Case C: switch vote target → update
     try {
-      await supabase
+      // 🚨 FIX: Routed through testable getter
+      await _supabase
           .from('votes')
           .update({'upvote_status': isUpvoteTarget})
           .eq('vote_id', existingLocalVote.voteId);
     } catch (_) {
-      await supabase
+      await _supabase
           .from('votes')
           .update({'upvote_status': isUpvoteTarget})
           .eq('user_id', userId)
@@ -572,7 +603,8 @@ class FeedRepository {
 
     int upvoteCount;
     try {
-      final count = await Supabase.instance.client
+      // 🚨 FIX: Routed through testable getter
+      final count = await _supabase
           .from('votes')
           .count(CountOption.exact)
           .eq('post_id', postId)
@@ -592,7 +624,8 @@ class FeedRepository {
 
     int commentCount = 0;
     try {
-      final cCount = await Supabase.instance.client
+      // 🚨 FIX: Routed through testable getter
+      final cCount = await _supabase
           .from('comments')
           .count(CountOption.exact)
           .eq('post_id', postId);

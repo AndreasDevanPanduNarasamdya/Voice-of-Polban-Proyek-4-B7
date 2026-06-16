@@ -202,17 +202,26 @@ class _WriterPageState extends State<WriterPage> {
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            queueEntry == null
-                ? 'Draft tidak ditemukan.'
-                : 'Draf dikirim untuk review: ${queueEntry.queueId}.',
+      if (queueEntry == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            // Use the error message from the controller, or a default offline message
+            content: Text(
+              _studioController.errorMessage ??
+                  'Gagal mengirim: Tidak ada koneksi internet.',
+            ),
+            backgroundColor: Colors.red,
           ),
-          backgroundColor: queueEntry == null ? Colors.red : Colors.green,
-        ),
-      );
-      if (queueEntry != null) {
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Draf berhasil dikirim untuk review: ${queueEntry.queueId}.',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
         Navigator.pop(context);
       }
     } catch (e) {
@@ -243,10 +252,7 @@ class _WriterPageState extends State<WriterPage> {
           icon: const Icon(Icons.arrow_back_ios, color: Color(0xFFFF8C00)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Image.asset(
-          'assets/Logo_VOP.png',
-          height: 32,
-        ),
+        title: Image.asset('assets/Logo_VOP.png', height: 32),
         centerTitle: true,
       ),
       body: SingleChildScrollView(

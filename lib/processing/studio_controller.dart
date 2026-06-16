@@ -99,12 +99,18 @@ class StudioController {
         localId,
         rawHashtags: rawHashtags,
       );
-      if (result == null) errorMessage = 'Draft not found.';
+
+      if (result == null) {
+        errorMessage = 'Draft not found.';
+      }
+
       return result;
     } catch (e) {
-      errorMessage = 'Failed to submit draft.';
+      // 🚨 Set the specific offline error message here
+      errorMessage =
+          'Failed to upload: No internet connection. Please try again later.';
       debugPrint('StudioController.submitDraft error: $e');
-      return null;
+      return null; // Return null so the UI knows it failed
     } finally {
       isLoading = false;
     }
