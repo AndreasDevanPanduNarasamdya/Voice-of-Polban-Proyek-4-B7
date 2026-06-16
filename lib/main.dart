@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-
+import 'package:flutter/material.dart';
 import 'processing/auth_controller.dart';
 import 'ui/screens/home_view.dart';
 import 'ui/screens/login_view.dart';
 import 'storage/hive_setup.dart';
+
+final GlobalKey<ScaffoldMessengerState> globalSnackbarKey =
+    GlobalKey<ScaffoldMessengerState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

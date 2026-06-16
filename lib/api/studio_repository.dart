@@ -203,29 +203,19 @@ class StudioRepository {
     final supabase = Supabase.instance.client;
 
     try {
+      // Direct cloud deletion attempt
       await supabase.from('posts').delete().eq('post_id', id);
 
+      // Local cleanup if cloud deletion succeeds
       if (_cachedPostsBox.containsKey(id)) await _cachedPostsBox.delete(id);
       if (_draftBox.containsKey(id)) await _draftBox.delete(id);
 
       return true;
     } catch (e) {
-      debugPrint(
-        'Failed to delete article online: $e. Queuing offline delete.',
+      // Force an error if offline, completely bypassing the SyncQueue
+      throw Exception(
+        'Gagal menghapus: Anda harus online untuk menghapus artikel.',
       );
-
-      if (_cachedPostsBox.containsKey(id)) await _cachedPostsBox.delete(id);
-      if (_draftBox.containsKey(id)) await _draftBox.delete(id);
-
-      final queueEntry = SyncQueue(
-        queueId: _uuid.v4(),
-        actionType: 'DELETE_POST',
-        payload: jsonEncode({'postId': id}),
-        isProcessed: false,
-        createdAt: DateTime.now(),
-      );
-      await _queueBox.put(queueEntry.queueId, queueEntry);
-      return false;
     }
   }
 
@@ -508,7 +498,6 @@ class StudioRepository {
           .update({'status': PostStatus.published.name, 'rejection_note': note})
           .eq('post_id', postId);
 
-      // Update cached_post_box
       final cachedPost = _cachedPostsBox.get(postId);
       if (cachedPost != null) {
         final data = Map<String, dynamic>.from(
@@ -520,7 +509,6 @@ class StudioRepository {
         await _cachedPostsBox.put(postId, cachedPost);
       }
 
-      // ← ADD THIS: also update local_draft_box so the UI reacts immediately
       final draft = _draftBox.get(postId);
       if (draft != null) {
         draft.status = PostStatus.published;
@@ -531,8 +519,10 @@ class StudioRepository {
 
       return true;
     } catch (e) {
-      debugPrint('Failed to approve post $postId: $e');
-      return false;
+      // 🚨 Force offline error
+      throw Exception(
+        'Gagal menyetujui: Anda harus online untuk mempublikasi artikel.',
+      );
     }
   }
 
@@ -565,8 +555,10 @@ class StudioRepository {
 
       return true;
     } catch (e) {
-      debugPrint('Failed to reject post $postId: $e');
-      return false;
+      // 🚨 Force offline error
+      throw Exception(
+        'Gagal menolak: Anda harus online untuk menolak artikel.',
+      );
     }
   }
 

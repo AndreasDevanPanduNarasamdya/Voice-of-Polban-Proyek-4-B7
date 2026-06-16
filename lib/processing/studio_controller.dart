@@ -77,12 +77,17 @@ class StudioController {
   }
 
   Future<bool> deleteArticle(String id) async {
+    isLoading = true;
+    errorMessage = null;
     try {
       return await _repository.deleteArticle(id);
     } catch (e) {
-      errorMessage = 'Failed to delete article.';
+      // Strip the exception tag and set the UI error message
+      errorMessage = e.toString().replaceAll('Exception: ', '');
       debugPrint('StudioController.deleteArticle error: $e');
       return false;
+    } finally {
+      isLoading = false;
     }
   }
 
@@ -138,22 +143,30 @@ class StudioController {
   }
 
   Future<bool> approvePost(String postId, {String note = ''}) async {
+    isLoading = true;
+    errorMessage = null;
     try {
       return await _repository.approvePost(postId, note: note);
     } catch (e) {
-      errorMessage = 'Failed to approve post.';
+      errorMessage = e.toString().replaceAll('Exception: ', '');
       debugPrint('StudioController.approvePost error: $e');
       return false;
+    } finally {
+      isLoading = false;
     }
   }
 
   Future<bool> rejectPost(String postId, {String note = ''}) async {
+    isLoading = true;
+    errorMessage = null;
     try {
       return await _repository.rejectPost(postId, note: note);
     } catch (e) {
-      errorMessage = 'Failed to reject post.';
+      errorMessage = e.toString().replaceAll('Exception: ', '');
       debugPrint('StudioController.rejectPost error: $e');
       return false;
+    } finally {
+      isLoading = false;
     }
   }
 }

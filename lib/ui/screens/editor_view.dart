@@ -139,7 +139,9 @@ class _EditorPageState extends State<EditorPage> {
 
                       if (!success) {
                         setState(() {
+                          // 🚨 Now it reads the specific offline error from the controller
                           errorMessage =
+                              _controller.errorMessage ??
                               "Gagal memproses perubahan status artikel.";
                         });
                       } else {
@@ -224,17 +226,35 @@ class _EditorPageState extends State<EditorPage> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              onPressed: () {
-                Hive.box<CachedPost>('cached_post_box').delete(post.postId);
+              onPressed: () async {
+                // 1. Call the controller to permanently delete it from the cloud
+                final success = await _controller.deleteArticle(post.postId);
 
+                if (!context.mounted) return;
+
+                // Close the dialog box first
                 Navigator.pop(context);
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("Artikel di-drop (dihapus)."),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                if (success) {
+                  // 2. Show success if cloud deletion worked
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Artikel di-drop (dihapus permanen)."),
+                      backgroundColor:
+                          Colors.green, // Green for successful action
+                    ),
+                  );
+                } else {
+                  // 3. Show offline/failure error if it couldn't reach Supabase
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _controller.errorMessage ?? "Gagal menghapus artikel.",
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               },
               child: const Text("Drop", style: TextStyle(color: Colors.white)),
             ),
